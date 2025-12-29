@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Manirê | Dashboard Entradas In Natura</title>
+<style>
+  :root {
+    --bg:#0b0f14; --card:#111826; --text:#e7eef7; --muted:#9db0c5; --line:#223044;
+    --good:#26a269; --bad:#e01b24; --warn:#f5c211;
+  }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:18px 20px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  .muted { color:var(--muted); }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  input[type="text"] { width:min(900px, 92vw); padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1520; color:var(--text); }
+  button { padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#182234; color:var(--text); cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+  main { padding:18px 20px 28px; }
+  .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; } .span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+  @media (max-width: 1100px) {
+    .span-3,.span-4,.span-5,.span-6,.span-7,.span-8 { grid-column: span 12; }
+  }
+  .kpi { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+  .kpi .val { font-size:22px; font-weight:700; }
+  .kpi .lbl { color:var(--muted); font-size:12px; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { text-align:left; color:var(--muted); font-weight:600; }
+  .num { text-align:right; font-variant-numeric: tabular-nums; }
+  .pos { color:var(--good); } .neg { color:var(--bad); }
+  .barwrap { height:10px; background:#0f1520; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .bar { height:100%; background:var(--muted); }
+  .small { font-size:11px; }
+</style>
+</head>
+<body>
+<header>
+  <div style="flex:1 1 auto;">
+    <h1>Dashboard — Entradas In Natura (Manirê)</h1>
+    <div class="muted small" id="meta">Carregue um CSV publicado do Google Sheets para atualizar em tempo real.</div>
+  </div>
+  <div class="controls">
+    <input id="csvUrl" type="text" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vTr68Lpc3SFv05Wn28gQ3iBCk0jmRdRrWVGM49AE-3bVYR4poLY30Jxfaht2JDgUE5zyNx8vl55nAG2/pub?gid=625178800&single=true&output=csv" />
+    <button onclick="loadData()">Atualizar</button>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <div class="card span-3"><div class="kpi"><div><div class="lbl">Linhas (CSV)</div><div class="val" id="kpi_rows">—</div></div><span class="tag" id="kpi_lastdate">—</span></div></div>
+    <div class="card span-3"><div class="kpi"><div><div class="lbl">Produtos distintos</div><div class="val" id="kpi_prod">—</div></div><span class="tag">janela: 60d</span></div></div>
+    <div class="card span-3"><div class="kpi"><div><div class="lbl">R$ total (60d)</div><div class="val" id="kpi_rtotal">—</div></div><span class="tag" id="kpi_prevdate">—</span></div></div>
+    <div class="card span-3"><div class="kpi"><div><div class="lbl">Kilos recebidos (60d)</div><div class="val" id="kpi_kilo">—</div></div><span class="tag" id="kpi_missing">—</span></div></div>
+
+    <div class="card span-6">
+      <h3 style="margin:0 0 8px 0;">Maiores desvios de preço — média vs último preço/kg</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Regra: desvio% = (último R$/kg ÷ média R$/kg) − 1 (considera apenas R$/kg &gt; 0; janela 60 dias).
+      </div>
+      <div id="tbl_price"></div>
+    </div>
+
+    <div class="card span-6">
+      <h3 style="margin:0 0 8px 0;">Maior desvio — NEC KGs (Bruno) vs KILO recebido</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Regra: desvio% = (KILO − NEC) ÷ NEC (considera NEC &gt; 0 e KILO preenchido).
+      </div>
+      <div id="tbl_kgdev"></div>
+    </div>
+
+    <div class="card span-7">
+      <h3 style="margin:0 0 8px 0;">Dia anterior disponível — desvios &ge; 30% (preço/kg)</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        O dashboard identifica a última data do CSV e usa como “dia anterior” a data imediatamente anterior com registros.
+      </div>
+      <div id="tbl_prevday"></div>
+    </div>
+
+    <div class="card span-5">
+      <h3 style="margin:0 0 8px 0;">Curva ABC por KILO</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Base: soma de KILO (60 dias). A: até 80% acumulado, B: até 95%, C: restante.
+      </div>
+      <div id="tbl_abc"></div>
+    </div>
+
+    <div class="card span-12">
+      <h3 style="margin:0 0 8px 0;">Pendências de NF REC. (QLD. ≠ Atual/NRC/Rec.)</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Critério: NF REC. vazio e QLD. diferente de Atual, NRC, Rec. (linhas com QLD vazio também entram).
+      </div>
+      <div id="tbl_nf"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+function parseCSV(text) {
+  // parser simples (suporta aspas e vírgulas)
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i+1] === '"') { cell += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (c === ',' && !inQuotes) {
+      row.push(cell);
+      cell = "";
+    } else if ((c === '\n' || c === '\r') && !inQuotes) {
+      if (c === '\r' && text[i+1] === '\n') i++;
+      row.push(cell);
+      cell = "";
+      // evita adicionar linha vazia no final
+      if (row.some(x => x.trim() !== "")) rows.push(row);
+      row = [];
+    } else {
+      cell += c;
+    }
+  }
+  // última célula/linha
+  row.push(cell);
+  if (row.some(x => (x||"").trim() !== "")) rows.push(row);
+  return rows;
+}
+
+function fmtBRL(x) {
+  if (x == null || !isFinite(x)) return "—";
+  return x.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function fmtNum(x, d=2) {
+  if (x == null || !isFinite(x)) return "—";
+  return x.toLocaleString("pt-BR", { maximumFractionDigits: d });
+}
+function fmtPct(x, d=1) {
+  if (x == null || !isFinite(x)) return "—";
+  const v = x*100;
+  const s = v.toFixed(d) + "%";
+  return `<span class="${x>=0?'pos':'neg'}">${s}</span>`;
+}
+
+function toNum(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  // remove R$, espaços, milhares e normaliza vírgula
+  const clean = s.replace(/\s/g,'').replace('R$','').replace(/\./g,'').replace(',', '.').replace(/[^\d.-]/g,'');
+  const n = Number(clean);
+  return isFinite(n) ? n : null;
+}
+
+function toDate(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function buildTable(headers, rows, max=25) {
+  const safe = rows.slice(0, max);
+  let h = "<table><thead><tr>";
+  for (const x of headers) h += `<th>${x}</th>`;
+  h += "</tr></thead><tbody>";
+  for (const r of safe) {
+    h += "<tr>";
+    for (const c of r) h += `<td>${c}</td>`;
+    h += "</tr>";
+  }
+  h += "</tbody></table>";
+  return h;
+}
+
+function guessGvizUrl(csvUrl) {
+  // Esperado: https://docs.google.com/spreadsheets/d/e/<key>/pub?gid=...&single=true&output=csv
+  try {
+    const u = new URL(csvUrl);
+    const path = u.pathname; // /spreadsheets/d/e/<key>/pub
+    const parts = path.split('/').filter(Boolean);
+    const eIdx = parts.indexOf('e');
+    if (eIdx >= 0) {
+      const key = parts[eIdx+1];
+      const gid = u.searchParams.get('gid');
+      if (key && gid) {
+        return `https://docs.google.com/spreadsheets/d/e/${key}/gviz/tq?gid=${encodeURIComponent(gid)}&tqx=out:json`;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function loadGviz(csvUrl) {
+  return new Promise((resolve, reject) => {
+    const gvizUrl = guessGvizUrl(csvUrl);
+    if (!gvizUrl) return reject(new Error("Não foi possível derivar a URL GViz a partir do link CSV."));
+    const cbName = "__gviz_cb_" + Math.random().toString(36).slice(2);
+
+    // GViz retorna JS com google.visualization.Query.setResponse(...)
+    // Vamos interceptar o payload sobrescrevendo google.visualization.Query.setResponse temporariamente.
+    const oldGoogle = window.google;
+    window.google = window.google || {};
+    window.google.visualization = window.google.visualization || {};
+    window.google.visualization.Query = window.google.visualization.Query || {};
+    const oldSetResponse = window.google.visualization.Query.setResponse;
+
+    window.google.visualization.Query.setResponse = function(resp) {
+      try {
+        const cols = resp.table.cols.map(c => c.label || c.id || "");
+        const rows = resp.table.rows.map(r => r.c.map(c => (c && c.v != null) ? String(c.v) : ""));
+        // restaura
+        window.google.visualization.Query.setResponse = oldSetResponse;
+        if (!oldGoogle) {
+          // mantém objeto google criado, mas sem estragar o ambiente
+        }
+        resolve([cols, ...rows]);
+      } catch (err) {
+        window.google.visualization.Query.setResponse = oldSetResponse;
+        reject(err);
+      }
+    };
+
+    const s = document.createElement("script");
+    s.src = gvizUrl + "&_=" + Date.now();
+    s.async = true;
+    s.onerror = () => {
+      window.google.visualization.Query.setResponse = oldSetResponse;
+      reject(new Error("Falha ao carregar GViz (script)."));
+    };
+    // limpeza após carregar
+    s.onload = () => setTimeout(() => s.remove(), 0);
+    document.head.appendChild(s);
+  });
+}
+
+async function loadData() {
+  const url = document.getElementById("csvUrl").value.trim();
+  if (!url) { alert("Cole a URL CSV publicada."); return; }
+
+  document.getElementById("meta").textContent = "Carregando CSV...";
+  document.querySelectorAll(".kpi-value").forEach(el => el.textContent = "—");
+  ["tbl_price","tbl_kgdev","tbl_prevday","tbl_abc","tbl_nf"].forEach(id => document.getElementById(id).innerHTML = "");
+
+  let raw;
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const text = await r.text();
+    raw = parseCSV(text);
+  } catch (err) {
+    // fallback GViz (contorna CORS do CSV em alguns cenários)
+    try {
+      document.getElementById("meta").textContent = "CSV bloqueado (CORS). Tentando modo alternativo...";
+      raw = await loadGviz(url);
+    } catch (err2) {
+      console.error(err, err2);
+      document.getElementById("meta").textContent =
+        "Falha ao carregar. Provável bloqueio de CORS do Google ou link inválido.";
+      alert(
+        "Não consegui ler o CSV diretamente do navegador.\n\n" +
+        "Soluções que funcionam:\n" +
+        "1) Hospedar este HTML em GitHub/Cloudflare Pages (HTTPS) e tentar novamente.\n" +
+        "2) Usar a versão GViz (o painel tenta automaticamente, mas depende do link).\n" +
+        "3) Como plano B, baixar o CSV e abrir o dashboard apontando para um arquivo local servido por http.\n\n" +
+        "Detalhe técnico: " + (err2?.message || err?.message || "erro desconhecido")
+      );
+      return;
+    }
+  }
+
+  if (!raw || !raw.length) {
+    document.getElementById("meta").textContent = "CSV vazio.";
+    return;
+  }
+
+  const header = raw[0].map(h => (h||"").trim());
+  const idx = new Map(header.map((h,i)=>[h.toUpperCase(), i]));
+
+  function col(name) { return idx.get(name.toUpperCase()); }
+
+  // colunas esperadas
+  const cData = col("DATA");
+  const cProd = col("PRODUTO");
+  const cForn = col("FORNECEDOR");
+  const cNec  = col("NEC KGS (BRUNO)");
+  const cKilo = col("KILO");
+  const cRkg  = col("R$ KG");
+  const cRtot = col("R$ TOTAL");
+  const cNF   = col("NF REC.");
+  const cQLD  = col("QLD.");
+
+  // normaliza linhas
+  const rows = raw.slice(1).filter(r => r.some(x => (x||"").trim() !== ""));
+  const data = rows.map(r => {
+    const d = cData!=null ? toDate(r[cData]) : null;
+    const prod = cProd!=null ? String(r[cProd]||"").trim() : "";
+    return {
+      data: d,
+      dataISO: d ? d.toISOString().slice(0,10) : null,
+      produto: prod,
+      fornecedor: cForn!=null ? String(r[cForn]||"").trim() : "",
+      nec: cNec!=null ? toNum(r[cNec]) : null,
+      kilo: cKilo!=null ? toNum(r[cKilo]) : null,
+      rkg: cRkg!=null ? toNum(r[cRkg]) : null,
+      rtot: cRtot!=null ? toNum(r[cRtot]) : null,
+      nf: cNF!=null ? String(r[cNF]||"").trim() : "",
+      qld: cQLD!=null ? String(r[cQLD]||"").trim() : ""
+    };
+  }).filter(x => x.produto);
+
+  // janela 60d baseada na maior data disponível
+  const dates = data.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
+  const maxDate = dates.length ? dates[dates.length-1] : new Date();
+  const winStart = new Date(maxDate.getTime() - 60*24*3600*1000);
+
+  const inWin = data.filter(x => x.data && x.data >= winStart && x.data <= maxDate);
+
+  // KPIs
+  const linhas = data.length;
+  const produtos = new Set(data.map(x=>x.produto)).size;
+  const rTotal60 = inWin.map(x=>x.rtot).filter(x=>x!=null).reduce((s,v)=>s+v,0);
+  const kilos60 = inWin.map(x=>x.kilo).filter(x=>x!=null).reduce((s,v)=>s+v,0);
+
+  document.getElementById("kpi_rows").textContent = fmtNum(linhas,0);
+  document.getElementById("kpi_prod").textContent = fmtNum(produtos,0);
+  document.getElementById("kpi_rtotal").textContent = rTotal60 ? fmtBRL(rTotal60) : "—";
+  document.getElementById("kpi_kilo").textContent = kilos60 ? fmtNum(kilos60,0) : "—";
+
+  // 1) Desvios de preço: média vs último (R$/kg)
+  const byProd = new Map();
+  for (const r of inWin) {
+    if (r.rkg == null) continue;
+    if (!byProd.has(r.produto)) byProd.set(r.produto, []);
+    byProd.get(r.produto).push(r);
+  }
+  const priceDev = [];
+  for (const [p, arr] of byProd.entries()) {
+    arr.sort((a,b)=> (a.data?.getTime()||0)-(b.data?.getTime()||0));
+    const avg = arr.map(x=>x.rkg).reduce((s,v)=>s+v,0)/arr.length;
+    const last = arr[arr.length-1];
+    const dev = avg ? (last.rkg/avg)-1 : null;
+    priceDev.push({produto:p, avg, last:last.rkg, date:last.dataISO, dev, abs: dev==null?null:Math.abs(dev)});
+  }
+  priceDev.sort((a,b)=>(b.abs||-1)-(a.abs||-1));
+  document.getElementById("tbl_price").innerHTML = buildTable(
+    ["Produto","Média R$/kg (60d)","Último R$/kg","Desvio","Última data"],
+    priceDev.slice(0,25).map(x=>[
+      x.produto,
+      fmtBRL(x.avg),
+      fmtBRL(x.last),
+      fmtPct(x.dev),
+      x.date||""
+    ]),
+    25
+  );
+
+  // 2) Maior desvio NEC vs KILO
+  const kgdev = [];
+  for (const r of inWin) {
+    if (r.nec==null || r.nec===0 || r.kilo==null) continue;
+    const dev = (r.kilo - r.nec)/r.nec;
+    kgdev.push({...r, dev, abs: Math.abs(dev)});
+  }
+  kgdev.sort((a,b)=>b.abs-a.abs);
+  document.getElementById("tbl_kgdev").innerHTML = buildTable(
+    ["Data","Produto","Fornecedor","NEC","KILO","Desvio"],
+    kgdev.slice(0,25).map(x=>[
+      x.dataISO||"",
+      x.produto,
+      x.fornecedor,
+      fmtNum(x.nec,2),
+      fmtNum(x.kilo,2),
+      fmtPct(x.dev)
+    ]),
+    25
+  );
+
+  // 3) Dia anterior disponível: desvios >= 30% (preço/kg)
+  const uniqueDates = Array.from(new Set(inWin.map(x=>x.dataISO).filter(Boolean))).sort();
+  const yday = uniqueDates.length>1 ? uniqueDates[uniqueDates.length-2] : null;
+  let yRows = [];
+  if (yday) {
+    // construir média por produto para calcular desvio naquele dia
+    const avgByProd = new Map(priceDev.map(x=>[x.produto, x.avg]));
+    yRows = inWin.filter(x=>x.dataISO===yday && x.rkg!=null && avgByProd.get(x.produto))
+      .map(x=>{
+        const avg=avgByProd.get(x.produto);
+        const dev=(x.rkg/avg)-1;
+        return {...x, dev, abs: Math.abs(dev)};
+      })
+      .filter(x=>x.abs>=0.30)
+      .sort((a,b)=>b.abs-a.abs);
+  }
+  document.getElementById("tbl_prevday").innerHTML = yday ? buildTable(
+    ["Dia","Produto","Fornecedor","R$/kg","Média 60d","Desvio"],
+    yRows.slice(0,25).map(x=>[
+      yday,
+      x.produto,
+      x.fornecedor,
+      fmtBRL(x.rkg),
+      fmtBRL(priceDev.find(p=>p.produto===x.produto)?.avg || null),
+      fmtPct(x.dev)
+    ]),
+    25
+  ) : "<div class='muted'>Sem histórico suficiente para identificar “dia anterior”.</div>";
+
+  // 4) Curva ABC por KILO (60d)
+  const kiloByProd = new Map();
+  for (const r of inWin) {
+    if (r.kilo==null) continue;
+    kiloByProd.set(r.produto, (kiloByProd.get(r.produto)||0)+r.kilo);
+  }
+  const abc = Array.from(kiloByProd.entries()).map(([produto,kilo])=>({produto,kilo}));
+  abc.sort((a,b)=>b.kilo-a.kilo);
+  const totalK = abc.reduce((s,x)=>s+x.kilo,0) || 1;
+  let acc=0;
+  const abcRows = abc.map(x=>{
+    acc += x.kilo;
+    const accPct = acc/totalK;
+    const cls = accPct<=0.8 ? "A" : (accPct<=0.95 ? "B" : "C");
+    return {...x, accPct, cls};
+  });
+  document.getElementById("tbl_abc").innerHTML = buildTable(
+    ["Produto","KILO (60d)","% acum.","Classe"],
+    abcRows.slice(0,25).map(x=>[
+      x.produto,
+      fmtNum(x.kilo,0),
+      fmtPct(x.accPct,1),
+      `<span class="pill">${x.cls}</span>`
+    ]),
+    25
+  );
+
+  // 5) Pendências NF REC: NF vazio e QLD != Atual/NRC/Rec.
+  const bad = new Set(["ATUAL","NRC","REC.","REC"]);
+  const pend = inWin.filter(x=>{
+    const q = (x.qld||"").trim().toUpperCase();
+    return (!x.nf) && q && !bad.has(q);
+  });
+  document.getElementById("tbl_nf").innerHTML = buildTable(
+    ["Data","Produto","Fornecedor","QLD.","NF REC."],
+    pend.slice(0,25).map(x=>[
+      x.dataISO||"",
+      x.produto,
+      x.fornecedor,
+      x.qld||"",
+      x.nf||""
+    ]),
+    25
+  );
+
+  document.getElementById("meta").textContent =
+    `OK — ${fmtNum(linhas,0)} linhas. Janela: 60d até ${maxDate.toLocaleDateString("pt-BR")}. ` +
+    (yday ? `Dia anterior: ${new Date(yday).toLocaleDateString("pt-BR")}.` : "");
+}
+
+const br = document.getElementById("btnReload"); if (br) br.addEventListener("click", loadData);
+</script>
+</body>
+</html>
