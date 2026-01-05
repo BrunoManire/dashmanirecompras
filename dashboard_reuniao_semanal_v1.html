@@ -120,6 +120,10 @@
 
   th{ z-index:1; }
   th.stickyL, th.stickyL2{ z-index:4; }
+
+  /* Dash 4/5 money coloring */
+  .money-neg{ color: var(--bad); font-weight:700; }
+  .money-pos{ color: var(--good); font-weight:700; }
 </style>
 </head>
 <body>
@@ -213,7 +217,8 @@
     <div class="card span-12">
       <div class="muted small">
         <b>DEBUG (automático):</b> <span id="dbg_cols">—</span><br/>
-        <span id="dbg_lastcols">—</span>
+        <span id="dbg_lastcols">—</span><br/>
+        <span id="dbg_refcol" class="muted small">Coluna referência (Dash 4/5): —</span>
       </div>
     </div>
 
@@ -245,6 +250,62 @@
         Para cada semana: calcula Top 20 por KG (da semana) e aplica a mesma lógica do COEF.
       </div>
       <div class="tablewrap" id="tbl_coef_4w"></div>
+
+      <!-- =========================
+           DASH 4
+      ========================== -->
+      <div class="sep-strong"></div>
+
+      <h3 style="margin:12px 0 8px 0;">4) Compras erradas por R$ variável (ineficiência)</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Regra: para cada linha do dia, calcula (KG × Preço pago) − (KG × Preço referência).
+        Resultado negativo = prejuízo. Também identifica o pior produto do dia e do período.
+      </div>
+
+      <div class="grid" style="margin-bottom:12px;">
+        <div class="card span-4">
+          <div class="kpi">
+            <div>
+              <div class="lbl">Ineficiência no período</div>
+              <div class="val" id="kpi_inef_period">—</div>
+            </div>
+            <span class="tag" id="kpi_inef_note">Σ[(KG×Pago)−(KG×Ref)]</span>
+          </div>
+        </div>
+
+        <div class="card span-4">
+          <div class="kpi">
+            <div>
+              <div class="lbl">Pior dia (mais negativo)</div>
+              <div class="val" id="kpi_inef_worstday">—</div>
+            </div>
+            <span class="tag" id="kpi_inef_worstday_val">—</span>
+          </div>
+        </div>
+
+        <div class="card span-4">
+          <div class="kpi">
+            <div>
+              <div class="lbl">Pior produto (período)</div>
+              <div class="val" id="kpi_inef_worstprod">—</div>
+            </div>
+            <span class="tag" id="kpi_inef_worstprod_val">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tablewrap" id="tbl_inef_byday"></div>
+
+      <!-- =========================
+           DASH 5
+      ========================== -->
+      <div class="sep-strong"></div>
+
+      <h3 style="margin:12px 0 8px 0;">5) Ineficiência — últimas 4 semanas</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Soma a ineficiência por semana (segunda a domingo) e mostra o pior produto de cada semana.
+      </div>
+      <div class="tablewrap" id="tbl_inef_4w"></div>
     </div>
 
   </div>
@@ -315,6 +376,7 @@ let ALL_DATA = [];
 let MIN_DATE = null;
 let MAX_DATE = null;
 let RAW_HEADER = [];
+let REF_COL_NAME = null;
 
 /* CSV parser (simples) */
 function parseCSV(text){
@@ -383,6 +445,11 @@ function fmtPctHTML(x,d=2){
   if(x==null || !isFinite(x)) return "—";
   const s=(x*100).toFixed(d)+"%";
   return `<span class="${x>=0?'pos':'neg'}">${s}</span>`;
+}
+function fmtMoneySignedHTML(x){
+  if(x==null || !isFinite(x)) return "—";
+  const cls = (x < 0) ? "money-neg" : "money-pos";
+  return `<span class="${cls}">${fmtBRL(x)}</span>`;
 }
 
 /* Parsing numérico e data */
@@ -457,7 +524,7 @@ function applyDateFilter(){
 /* =========================
    Ordenação por clique em TH
 ========================= */
-const SORT_STATE = {}; // stateKey -> {key, dir}
+const SORT_STATE = {};
 function sortRows(rows, col){
   const {key, type} = col;
   const st = SORT_STATE[col.__stateKey] || {key:null, dir:1};
@@ -539,6 +606,9 @@ async function loadData(){
   document.getElementById("tbl_coef_top20").innerHTML="";
   document.getElementById("tbl_coef_pivot").innerHTML="";
   document.getElementById("tbl_coef_4w").innerHTML="";
+  document.getElementById("tbl_inef_byday").innerHTML="";
+  document.getElementById("tbl_inef_4w").innerHTML="";
+  document.getElementById("dbg_refcol").textContent="Coluna referência (Dash 4/5): —";
 
   let raw;
   try{
@@ -564,24 +634,49 @@ async function loadData(){
   const tail = RAW_HEADER.slice(Math.max(0, RAW_HEADER.length-14));
   document.getElementById("dbg_lastcols").innerHTML = `Últimas colunas: <code>${tail.join(" | ")}</code>`;
 
+  // obrigatórias pro bloco COEF
   const cData = colAny(idx, ["DATA"]);
   const cProd = colAny(idx, ["PRODUTO"]);
-  const cKilo = colAny(idx, ["KILO"]);
-  const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG"]);
+  const cKilo = colAny(idx, ["KILO","KG","KGS","QUANTIDADE","QTDE","QTD"]);
+  const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG","PRECO","PREÇO","PRECO_PAGO","PREÇO PAGO","VALOR KG","VALOR_KG"]);
+
+  // referência base (Dash 4/5)
+  const refCandidates = [
+    "PRECO_REFERENCIA","PREÇO REFERÊNCIA","PRECO_REF","PREÇO_REF",
+    "R$.KG_REF","R$ KG REF","R$/KG REF","R$KG REF",
+    "BASE_RKG","RKG_BASE","REFERENCIA","REFERÊNCIA",
+    "PRECO_BASE","PREÇO BASE","VALOR_BASE","R$_KG_BASE"
+  ];
+  const cRef = colAny(idx, refCandidates);
+  REF_COL_NAME = (cRef==null) ? null : RAW_HEADER[cRef];
 
   if(cData==null || cProd==null || cKilo==null || cRkg==null){
-    alert("Não encontrei todas as colunas necessárias: DATA, PRODUTO, KILO, R$.KG.\nVerifique o cabeçalho no DEBUG.");
+    alert("Não encontrei todas as colunas necessárias: DATA, PRODUTO, KILO/KG, R$.KG.\nVerifique o cabeçalho no DEBUG.");
     document.getElementById("meta").textContent="Erro: faltam colunas para o bloco COEFICIENTE.";
     return;
   }
+
+  document.getElementById("dbg_refcol").textContent =
+    `Coluna referência (Dash 4/5): ${REF_COL_NAME ? REF_COL_NAME : "NÃO ENCONTRADA"}`;
 
   const rows = raw.slice(1).filter(r => r.some(x => String(x||"").trim() !== ""));
   const data = rows.map(r=>{
     const d = toDate(r[cData]);
     const produto = String(r[cProd]||"").trim();
     const kilo = toNum(r[cKilo]);
-    const rkg  = toNum(r[cRkg]);
-    return { data:d, dataISO: d?toISO(d):null, produto, kilo, rkg };
+
+    const pricePaid = toNum(r[cRkg]);              // preço pago por KG (usado no COEF e Dash 4/5)
+    const priceRef  = (cRef==null) ? null : toNum(r[cRef]); // preço referência base por KG
+
+    return {
+      data:d,
+      dataISO: d?toISO(d):null,
+      produto,
+      kilo,
+      rkg: pricePaid,      // compatibilidade com seu bloco COEF
+      pricePaid,
+      priceRef
+    };
   }).filter(x=>x.data && x.produto);
 
   ALL_DATA = data;
@@ -755,6 +850,129 @@ function buildLast4WeeksCoef(allDataFiltered, endDate){
 }
 
 /* =========================
+   Dash 4/5 - Ineficiência
+========================= */
+function buildInefByDay(dataFiltered){
+  const byDay = new Map();
+  const byProdPeriodo = new Map();
+
+  for(const r of dataFiltered){
+    if(!r.dataISO || !r.produto) continue;
+
+    const kg = (r.kilo==null || !isFinite(r.kilo)) ? 0 : r.kilo;
+    if(kg <= 0) continue;
+
+    const paid = r.pricePaid;
+    const ref  = r.priceRef;
+    if(paid==null || ref==null || !isFinite(paid) || !isFinite(ref)) continue;
+
+    const delta = (kg * paid) - (kg * ref); // negativo = prejuízo
+
+    if(!byDay.has(r.dataISO)) byDay.set(r.dataISO, new Map());
+    const mProd = byDay.get(r.dataISO);
+    mProd.set(r.produto, (mProd.get(r.produto) || 0) + delta);
+
+    byProdPeriodo.set(r.produto, (byProdPeriodo.get(r.produto) || 0) + delta);
+  }
+
+  const rowsDay = [];
+  let totalPeriodo = 0;
+
+  for(const [dayISO, mProd] of byDay.entries()){
+    let sumDay = 0;
+    let worstProd = null;
+    let worstVal = 0;
+
+    for(const [prod, val] of mProd.entries()){
+      sumDay += val;
+      if(worstProd === null || val < worstVal){
+        worstProd = prod;
+        worstVal = val;
+      }
+    }
+
+    totalPeriodo += sumDay;
+    rowsDay.push({
+      dataISO: dayISO,
+      data: new Date(dayISO + "T00:00:00"),
+      inef: sumDay,
+      pior_produto: worstProd || "—",
+      pior_val: (worstProd ? worstVal : null)
+    });
+  }
+
+  rowsDay.sort((a,b)=> a.data - b.data);
+
+  let worstDay = null;
+  for(const r of rowsDay){
+    if(worstDay === null || r.inef < worstDay.inef) worstDay = r;
+  }
+
+  let worstProdPeriodo = null;
+  for(const [prod, val] of byProdPeriodo.entries()){
+    if(worstProdPeriodo === null || val < worstProdPeriodo.val){
+      worstProdPeriodo = {prod, val};
+    }
+  }
+
+  return { rowsDay, totalPeriodo, worstDay, worstProdPeriodo };
+}
+
+function buildLast4WeeksInef(dataFiltered, endDate){
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  const w0 = startOfISOWeek(end);
+
+  const weeks = [];
+  for(let i=0;i<4;i++){
+    const ws = addDays(w0, -7*i);
+    const we = addDays(ws, 6);
+    weeks.push({ ws, we });
+  }
+  weeks.reverse();
+
+  const out = [];
+
+  for(const w of weeks){
+    const wData = dataFiltered.filter(r => r.data>=w.ws && r.data<=addDays(w.we,0));
+
+    const byProd = new Map();
+    let sumWeek = 0;
+
+    for(const r of wData){
+      const kg = (r.kilo==null || !isFinite(r.kilo)) ? 0 : r.kilo;
+      if(kg <= 0) continue;
+
+      const paid = r.pricePaid;
+      const ref  = r.priceRef;
+      if(paid==null || ref==null || !isFinite(paid) || !isFinite(ref)) continue;
+
+      const delta = (kg * paid) - (kg * ref);
+      sumWeek += delta;
+      byProd.set(r.produto, (byProd.get(r.produto) || 0) + delta);
+    }
+
+    let worstProd = null;
+    let worstVal = 0;
+    for(const [p,v] of byProd.entries()){
+      if(worstProd === null || v < worstVal){
+        worstProd = p;
+        worstVal = v;
+      }
+    }
+
+    out.push({
+      semana: `${w.ws.toLocaleDateString("pt-BR")} → ${w.we.toLocaleDateString("pt-BR")}`,
+      inef: sumWeek,
+      pior_produto: worstProd || "—",
+      pior_val: (worstProd ? worstVal : null),
+      linhas: wData.length
+    });
+  }
+
+  return out;
+}
+
+/* =========================
    Render helpers do Pivot (sticky + quebra)
 ========================= */
 function applyPivotStickyStyles(wrap){
@@ -827,7 +1045,7 @@ function renderPage(dataFiltered){
   SORT_STATE["coefTop20"] = {key:"kilos", dir:-1};
   sortRows(top20Rows, {...colsTop20.find(c=>c.key==="kilos"), __stateKey:"coefTop20"});
 
-  const top20HTML = buildSortableTableHTML(
+  document.getElementById("tbl_coef_top20").innerHTML = buildSortableTableHTML(
     "coefTop20",
     colsTop20,
     top20Rows,
@@ -842,17 +1060,14 @@ function renderPage(dataFiltered){
       (r.coef==null) ? "—" : fmtPctHTML(r.coef,2)
     ]
   );
-  document.getElementById("tbl_coef_top20").innerHTML = top20HTML;
-
   bindSortClicks("tbl_coef_top20", "coefTop20", colsTop20, top20Rows, (r)=>[
     r.produto, fmtNum(r.kilos,0), fmtBRL(r.min_rkg), fmtBRL(r.max_rkg),
     fmtBRL(r.dif_precos), fmtBRL(r.dif_ex_min), fmtBRL(r.ex_pon),
     (r.coef==null) ? "—" : fmtPctHTML(r.coef,2)
   ]);
 
-  // ===== 2) Pivot por dia (Top 20) — NOVO (ordem, sticky, cores) =====
+  // ===== 2) Pivot por dia (Top 20) =====
   const wrapPivot = document.getElementById("tbl_coef_pivot");
-
   if(selMin && selMax && top20.length){
     const { days, rows } = buildPivotTop20(dataFiltered, top20, selMin, selMax);
 
@@ -864,7 +1079,6 @@ function renderPage(dataFiltered){
       ...daysDesc.map(d=>({key:d, type:"num", label:new Date(d).toLocaleDateString("pt-BR")}))
     ];
 
-    // default sort: TOTAL_GERAL desc (fixo)
     SORT_STATE["coefPivot"] = {key:"TOTAL_GERAL", dir:-1};
     sortRows(rows, {...colsPivot.find(c=>c.key==="TOTAL_GERAL"), __stateKey:"coefPivot"});
 
@@ -874,7 +1088,6 @@ function renderPage(dataFiltered){
         `<span>${r.produto}</span>`,
         (tot==null) ? "—" : fmtBRL(tot)
       ];
-
       for(const d of daysDesc){
         const v = r[d];
         if(v==null || !isFinite(v) || tot==null || !isFinite(tot)){
@@ -889,16 +1102,12 @@ function renderPage(dataFiltered){
 
     wrapPivot.innerHTML = buildSortableTableHTML("coefPivot", colsPivot, rows, renderPivotRow);
     applyPivotStickyStyles(wrapPivot);
-
-    // clique para ordenar + reaplicar sticky
     bindSortClicks("tbl_coef_pivot", "coefPivot", colsPivot, rows, renderPivotRow, (wrap)=>applyPivotStickyStyles(wrap));
-
   } else {
-    wrapPivot.innerHTML =
-      `<div class="muted small" style="padding:10px;">Sem dados para montar o pivot no período.</div>`;
+    wrapPivot.innerHTML = `<div class="muted small" style="padding:10px;">Sem dados para montar o pivot no período.</div>`;
   }
 
-  // ===== 3) Últimas 4 semanas =====
+  // ===== 3) Últimas 4 semanas (COEF) =====
   if(selMax){
     const last4w = buildLast4WeeksCoef(dataFiltered, selMax);
     const cols4w = [
@@ -910,7 +1119,7 @@ function renderPage(dataFiltered){
 
     SORT_STATE["coef4w"] = {key:"semana", dir:1};
 
-    const html4w = buildSortableTableHTML(
+    document.getElementById("tbl_coef_4w").innerHTML = buildSortableTableHTML(
       "coef4w",
       cols4w,
       last4w,
@@ -921,8 +1130,6 @@ function renderPage(dataFiltered){
         fmtNum(r.linhas,0)
       ]
     );
-    document.getElementById("tbl_coef_4w").innerHTML = html4w;
-
     bindSortClicks("tbl_coef_4w", "coef4w", cols4w, last4w, (r)=>[
       r.semana,
       (r.coef==null) ? "—" : fmtPctHTML(r.coef,2),
@@ -934,9 +1141,115 @@ function renderPage(dataFiltered){
       `<div class="muted small" style="padding:10px;">Sem datas suficientes para calcular as 4 semanas.</div>`;
   }
 
+  // ===== 4) Ineficiência por dia =====
+  const hasRef = dataFiltered.some(r => r.priceRef!=null && isFinite(r.priceRef));
+  if(!hasRef){
+    document.getElementById("kpi_inef_period").textContent = "—";
+    document.getElementById("kpi_inef_worstday").textContent = "—";
+    document.getElementById("kpi_inef_worstday_val").textContent = "Sem coluna de referência";
+    document.getElementById("kpi_inef_worstprod").textContent = "—";
+    document.getElementById("kpi_inef_worstprod_val").textContent = "—";
+
+    document.getElementById("tbl_inef_byday").innerHTML =
+      `<div class="muted small" style="padding:10px;">Sem dados de preço referência para calcular ineficiência (Dash 4/5). Confira o cabeçalho no DEBUG.</div>`;
+
+    document.getElementById("tbl_inef_4w").innerHTML =
+      `<div class="muted small" style="padding:10px;">Sem dados de preço referência para calcular as 4 semanas (Dash 5).</div>`;
+  } else {
+    const { rowsDay, totalPeriodo, worstDay, worstProdPeriodo } = buildInefByDay(dataFiltered);
+
+    document.getElementById("kpi_inef_period").innerHTML = fmtMoneySignedHTML(totalPeriodo);
+
+    if(worstDay){
+      document.getElementById("kpi_inef_worstday").textContent = worstDay.data.toLocaleDateString("pt-BR");
+      document.getElementById("kpi_inef_worstday_val").innerHTML = fmtMoneySignedHTML(worstDay.inef);
+    } else {
+      document.getElementById("kpi_inef_worstday").textContent = "—";
+      document.getElementById("kpi_inef_worstday_val").textContent = "—";
+    }
+
+    if(worstProdPeriodo){
+      document.getElementById("kpi_inef_worstprod").textContent = worstProdPeriodo.prod;
+      document.getElementById("kpi_inef_worstprod_val").innerHTML = fmtMoneySignedHTML(worstProdPeriodo.val);
+    } else {
+      document.getElementById("kpi_inef_worstprod").textContent = "—";
+      document.getElementById("kpi_inef_worstprod_val").textContent = "—";
+    }
+
+    const colsDay = [
+      {key:"dataISO", type:"str", label:"DATA"},
+      {key:"inef", type:"num", label:"INEFICIÊNCIA (R$)"},
+      {key:"pior_produto", type:"str", label:"PIOR PRODUTO"},
+      {key:"pior_val", type:"num", label:"PIOR PRODUTO (R$)"}
+    ];
+
+    // default: pior (mais negativo) primeiro
+    SORT_STATE["inefByDay"] = {key:"inef", dir:1};
+    sortRows(rowsDay, {...colsDay.find(c=>c.key==="inef"), __stateKey:"inefByDay"});
+
+    document.getElementById("tbl_inef_byday").innerHTML = buildSortableTableHTML(
+      "inefByDay",
+      colsDay,
+      rowsDay,
+      (r)=>[
+        new Date(r.dataISO).toLocaleDateString("pt-BR"),
+        fmtMoneySignedHTML(r.inef),
+        r.pior_produto,
+        fmtMoneySignedHTML(r.pior_val)
+      ]
+    );
+
+    bindSortClicks("tbl_inef_byday", "inefByDay", colsDay, rowsDay, (r)=>[
+      new Date(r.dataISO).toLocaleDateString("pt-BR"),
+      fmtMoneySignedHTML(r.inef),
+      r.pior_produto,
+      fmtMoneySignedHTML(r.pior_val)
+    ]);
+
+    // ===== 5) Ineficiência últimas 4 semanas =====
+    if(selMax){
+      const w4 = buildLast4WeeksInef(dataFiltered, selMax);
+
+      const colsW4 = [
+        {key:"semana", type:"str", label:"SEMANA"},
+        {key:"inef", type:"num", label:"INEFICIÊNCIA (R$)"},
+        {key:"pior_produto", type:"str", label:"PIOR PRODUTO"},
+        {key:"pior_val", type:"num", label:"PIOR PRODUTO (R$)"},
+        {key:"linhas", type:"num", label:"LINHAS"}
+      ];
+
+      SORT_STATE["inef4w"] = {key:"inef", dir:1};
+      sortRows(w4, {...colsW4.find(c=>c.key==="inef"), __stateKey:"inef4w"});
+
+      document.getElementById("tbl_inef_4w").innerHTML = buildSortableTableHTML(
+        "inef4w",
+        colsW4,
+        w4,
+        (r)=>[
+          r.semana,
+          fmtMoneySignedHTML(r.inef),
+          r.pior_produto,
+          fmtMoneySignedHTML(r.pior_val),
+          fmtNum(r.linhas,0)
+        ]
+      );
+
+      bindSortClicks("tbl_inef_4w", "inef4w", colsW4, w4, (r)=>[
+        r.semana,
+        fmtMoneySignedHTML(r.inef),
+        r.pior_produto,
+        fmtMoneySignedHTML(r.pior_val),
+        fmtNum(r.linhas,0)
+      ]);
+    } else {
+      document.getElementById("tbl_inef_4w").innerHTML =
+        `<div class="muted small" style="padding:10px;">Sem datas suficientes para calcular as 4 semanas.</div>`;
+    }
+  }
+
   document.getElementById("meta").textContent =
     `OK — ${fmtNum(dataFiltered.length,0)} linhas no período. ` +
-    `Ordene clicando nos cabeçalhos (Top 20 / Pivot / 4 semanas).`;
+    `Ordene clicando nos cabeçalhos (Top 20 / Pivot / 4 semanas / Ineficiência).`;
 }
 
 /* boot */
