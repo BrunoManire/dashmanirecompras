@@ -35,7 +35,6 @@
   table { width:100%; border-collapse:collapse; font-size:12px; }
   th, td { padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { text-align:left; color:var(--muted); font-weight:600; }
-  .num { text-align:right; font-variant-numeric: tabular-nums; }
   .pos { color:var(--good); } .neg { color:var(--bad); }
 </style>
 </head>
@@ -108,9 +107,10 @@
     </div>
 
     <div class="card span-6">
-      <h3 style="margin:0 0 8px 0;">Maiores desvios de preço — média vs último preço/kg</h3>
+      <h3 style="margin:0 0 8px 0;">Maiores desvios de preço — DIF. R$ (AK) fora de ±30%</h3>
       <div class="muted small" style="margin-bottom:10px;">
-        Regra: desvio% = (último R$/kg ÷ média R$/kg) − 1 (considera apenas R$/kg &gt; 0; janela 60 dias).
+        Regra: lista linhas onde <b>DIF. R$</b> ≥ +30% ou ≤ −30%, usando colunas do Sheets:
+        PRODUTO (D), LOTE (A), DATA (C), R$.KG (U), BASE R$ (AJ), DIF. R$ (AK).
       </div>
       <div id="tbl_price"></div>
     </div>
@@ -151,12 +151,15 @@
 
 <script>
 /* =========================
-   Utils
+   Estado
 ========================= */
 let ALL_DATA = [];
 let MIN_DATE = null;
 let MAX_DATE = null;
 
+/* =========================
+   CSV parser
+========================= */
 function parseCSV(text) {
   const rows = [];
   let row = [];
@@ -186,6 +189,9 @@ function parseCSV(text) {
   return rows;
 }
 
+/* =========================
+   Format
+========================= */
 function fmtBRL(x) {
   if (x == null || !isFinite(x)) return "—";
   return x.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -201,6 +207,9 @@ function fmtPctHTML(x, d=1) {
   return `<span class="${x>=0?'pos':'neg'}">${s}</span>`;
 }
 
+/* =========================
+   Parsing helpers
+========================= */
 function toNum(v) {
   if (v == null) return null;
   const s = String(v).trim();
@@ -215,6 +224,19 @@ function toNum(v) {
   return isFinite(n) ? n : null;
 }
 
+// para percentuais vindos como "12,52%" => 0.1252; ou "-8,42%" => -0.0842
+function toPct(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const hasPct = s.includes("%");
+  let n = toNum(s);
+  if (n == null) return null;
+  // se veio com "%", ou se é número "grande" (ex.: 12.52), normaliza para fração
+  if (hasPct || Math.abs(n) > 1) n = n / 100;
+  return n;
+}
+
 function toDate(v) {
   if (!v) return null;
   const s = String(v).trim();
@@ -223,11 +245,11 @@ function toDate(v) {
   const d = new Date(s);
   return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
+function toISO(date) { return date.toISOString().slice(0,10); }
 
-function toISO(date) {
-  return date.toISOString().slice(0,10);
-}
-
+/* =========================
+   Tables
+========================= */
 function buildTable(headers, rows, max=25) {
   const safe = rows.slice(0, max);
   let h = "<table><thead><tr>";
@@ -240,6 +262,15 @@ function buildTable(headers, rows, max=25) {
   }
   h += "</tbody></table>";
   return h;
+}
+
+// Busca coluna por nome (insensível a maiúsculas) com fallback
+function colAny(idxMap, candidates) {
+  for (const c of candidates) {
+    const i = idxMap.get(String(c).toUpperCase());
+    if (i != null) return i;
+  }
+  return null;
 }
 
 /* =========================
@@ -293,7 +324,7 @@ function applyDateFilter() {
 }
 
 /* =========================
-   Load data (CSV fetch)
+   Load data
 ========================= */
 async function loadData() {
   const url = document.getElementById("csvUrl").value.trim();
@@ -329,18 +360,20 @@ async function loadData() {
 
   const header = raw[0].map(h => (h||"").trim());
   const idx = new Map(header.map((h,i)=>[h.toUpperCase(), i]));
-  const col = (name) => idx.get(String(name).toUpperCase());
 
-  // colunas esperadas
-  const cData = col("DATA");
-  const cProd = col("PRODUTO");
-  const cForn = col("FORNECEDOR");
-  const cNec  = col("NEC KGS (BRUNO)");
-  const cKilo = col("KILO");
-  const cRkg  = col("R$ KG");
-  const cRtot = col("R$ TOTAL");
-  const cNF   = col("NF REC.");
-  const cQLD  = col("QLD.");
+  // nomes conforme seu print
+  const cLote  = colAny(idx, ["LOTE"]);
+  const cData  = colAny(idx, ["DATA"]);
+  const cProd  = colAny(idx, ["PRODUTO"]);
+  const cForn  = colAny(idx, ["FORNECEDOR"]);
+  const cNec   = colAny(idx, ["KGS (BRL)", "NEC KGS (BRUNO)"]); // se você tiver os 2, mantém pelo nome encontrado
+  const cKilo  = colAny(idx, ["KILO"]);
+  const cRkg   = colAny(idx, ["R$.KG", "R$ KG", "R$/KG"]);
+  const cRtot  = colAny(idx, ["R$.TOTAL", "R$ TOTAL"]);
+  const cNF    = colAny(idx, ["NF REC.", "NF REC"]);
+  const cQLD   = colAny(idx, ["QLD.", "QLD"]);
+  const cBaseR = colAny(idx, ["BASE R$"]);   // AJ
+  const cDifR  = colAny(idx, ["DIF. R$"]);   // AK (percentual)
 
   const rows = raw.slice(1).filter(r => r.some(x => (x||"").trim() !== ""));
   const data = rows.map(r => {
@@ -349,12 +382,15 @@ async function loadData() {
     return {
       data: d,
       dataISO: d ? d.toISOString().slice(0,10) : null,
+      lote: cLote!=null ? String(r[cLote]||"").trim() : "",
       produto: prod,
       fornecedor: cForn!=null ? String(r[cForn]||"").trim() : "",
       nec: cNec!=null ? toNum(r[cNec]) : null,
       kilo: cKilo!=null ? toNum(r[cKilo]) : null,
       rkg: cRkg!=null ? toNum(r[cRkg]) : null,
       rtot: cRtot!=null ? toNum(r[cRtot]) : null,
+      base_r: cBaseR!=null ? toNum(r[cBaseR]) : null,     // AJ
+      dif_r_pct: cDifR!=null ? toPct(r[cDifR]) : null,    // AK (fração)
       nf: cNF!=null ? String(r[cNF]||"").trim() : "",
       qld: cQLD!=null ? String(r[cQLD]||"").trim() : ""
     };
@@ -362,10 +398,8 @@ async function loadData() {
 
   ALL_DATA = data;
 
-  // inicializa datas automaticamente com base no CSV
   setDateInputsFromData(ALL_DATA);
 
-  // render com período selecionado
   const filtered = filterBySelectedDates(ALL_DATA);
   renderDashboard(filtered);
 }
@@ -374,17 +408,16 @@ async function loadData() {
    Render dashboard
 ========================= */
 function renderDashboard(dataFiltered) {
-  // datas do período selecionado
   const datesSel = dataFiltered.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
   const selMin = datesSel.length ? datesSel[0] : null;
   const selMax = datesSel.length ? datesSel[datesSel.length-1] : null;
 
-  // janela 60d baseada na última data DO PERÍODO selecionado
+  // janela 60d baseada na última data do período selecionado
   const maxDate = selMax || new Date();
   const winStart = new Date(maxDate.getTime() - 60*24*3600*1000);
   const inWin = dataFiltered.filter(x => x.data && x.data >= winStart && x.data <= maxDate);
 
-  // KPIs baseados no período selecionado (linhas/produtos) e janela 60d (R$ e KILO)
+  // KPIs
   const linhas = dataFiltered.length;
   const produtos = new Set(dataFiltered.map(x=>x.produto)).size;
   const rTotal60 = inWin.map(x=>x.rtot).filter(x=>x!=null).reduce((s,v)=>s+v,0);
@@ -396,41 +429,44 @@ function renderDashboard(dataFiltered) {
   document.getElementById("kpi_prod").textContent = fmtNum(produtos,0);
   document.getElementById("kpi_rtotal").textContent = rTotal60 ? fmtBRL(rTotal60) : "—";
   document.getElementById("kpi_kilo").textContent = kilos60 ? fmtNum(kilos60,0) : "—";
-
   document.getElementById("kpi_lastdate").textContent = selMax ? `até ${selMax.toLocaleDateString("pt-BR")}` : "—";
   document.getElementById("kpi_missing").textContent = inWin.length ? `KILO ausente: ${(kiloMissing*100).toFixed(1)}%` : "—";
 
-  // 1) Desvios de preço (R$/kg) — média vs último
-  const byProd = new Map();
-  for (const r of inWin) {
-    if (r.rkg == null || r.rkg <= 0) continue;
-    if (!byProd.has(r.produto)) byProd.set(r.produto, []);
-    byProd.get(r.produto).push(r);
-  }
+  /* =========================
+     1) RELATÓRIO AJ/AK — DIF. R$ fora de ±30%
+     Campos: PRODUTO, LOTE, DATA, R$.KG, BASE R$, DIF. R$
+  ========================= */
+  const priceAlerts = inWin
+    .filter(x => x.dif_r_pct != null && isFinite(x.dif_r_pct))
+    .filter(x => Math.abs(x.dif_r_pct) >= 0.30)
+    .map(x => {
+      const impacto = (x.kilo!=null && x.rkg!=null && x.base_r!=null)
+        ? (x.rkg - x.base_r) * x.kilo
+        : null;
+      return { ...x, impacto, abs: Math.abs(x.dif_r_pct) };
+    })
+    .sort((a,b) => (b.abs - a.abs));
 
-  const priceDev = [];
-  for (const [p, arr] of byProd.entries()) {
-    arr.sort((a,b)=> (a.data?.getTime()||0)-(b.data?.getTime()||0));
-    const avg = arr.map(x=>x.rkg).reduce((s,v)=>s+v,0)/arr.length;
-    const last = arr[arr.length-1];
-    const dev = avg ? (last.rkg/avg)-1 : null;
-    priceDev.push({produto:p, avg, last:last.rkg, date:last.dataISO, dev, abs: dev==null?null:Math.abs(dev)});
-  }
-  priceDev.sort((a,b)=>(b.abs||-1)-(a.abs||-1));
+  document.getElementById("tbl_price").innerHTML = priceAlerts.length
+    ? buildTable(
+        ["Produto","Lote","Data","R$.KG","Base R$","DIF. R$","KILO","Impacto (R$)"],
+        priceAlerts.slice(0,50).map(x => [
+          x.produto,
+          x.lote || "",
+          x.dataISO ? new Date(x.dataISO).toLocaleDateString("pt-BR") : "",
+          fmtBRL(x.rkg),
+          fmtBRL(x.base_r),
+          fmtPctHTML(x.dif_r_pct,1),
+          fmtNum(x.kilo,2),
+          x.impacto==null ? "—" : fmtBRL(x.impacto)
+        ]),
+        50
+      )
+    : "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
 
-  document.getElementById("tbl_price").innerHTML = priceDev.length ? buildTable(
-    ["Produto","Média R$/kg (60d)","Último R$/kg","Desvio","Última data"],
-    priceDev.slice(0,25).map(x=>[
-      x.produto,
-      fmtBRL(x.avg),
-      fmtBRL(x.last),
-      fmtPctHTML(x.dev),
-      x.date||""
-    ]),
-    25
-  ) : "<div class='muted small'>Sem dados suficientes de R$ KG na janela de 60 dias.</div>";
-
-  // 2) Desvio NEC vs KILO
+  /* =========================
+     2) Desvio NEC vs KILO (mantido)
+  ========================= */
   const kgdev = [];
   for (const r of inWin) {
     if (r.nec==null || r.nec===0 || r.kilo==null) continue;
@@ -447,46 +483,46 @@ function renderDashboard(dataFiltered) {
       x.fornecedor,
       fmtNum(x.nec,2),
       fmtNum(x.kilo,2),
-      fmtPctHTML(x.dev)
+      fmtPctHTML(x.dev,1)
     ]),
     25
   ) : "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
 
-  // 3) Dia anterior disponível — desvios >= 30% (preço/kg)
+  /* =========================
+     3) Dia anterior — agora usando o mesmo critério de DIF. R$
+     (se você quiser manter o antigo por R$/kg, eu ajusto)
+  ========================= */
   const uniqueDates = Array.from(new Set(inWin.map(x=>x.dataISO).filter(Boolean))).sort();
   const yday = uniqueDates.length>1 ? uniqueDates[uniqueDates.length-2] : null;
   document.getElementById("kpi_prevdate").textContent = yday ? `dia ant.: ${new Date(yday).toLocaleDateString("pt-BR")}` : "dia ant.: —";
 
   let yRows = [];
-  if (yday && priceDev.length) {
-    const avgByProd = new Map(priceDev.map(x=>[x.produto, x.avg]));
+  if (yday) {
     yRows = inWin
-      .filter(x=>x.dataISO===yday && x.rkg!=null && x.rkg>0 && avgByProd.get(x.produto))
-      .map(x=>{
-        const avg=avgByProd.get(x.produto);
-        const dev=(x.rkg/avg)-1;
-        return {...x, avg, dev, abs: Math.abs(dev)};
-      })
-      .filter(x=>x.abs>=0.30)
-      .sort((a,b)=>b.abs-a.abs);
+      .filter(x=>x.dataISO===yday && x.dif_r_pct!=null && isFinite(x.dif_r_pct))
+      .filter(x=>Math.abs(x.dif_r_pct) >= 0.30)
+      .sort((a,b)=>Math.abs(b.dif_r_pct)-Math.abs(a.dif_r_pct));
   }
 
   document.getElementById("tbl_prevday").innerHTML = yday ? (
     yRows.length ? buildTable(
-      ["Dia","Produto","Fornecedor","R$/kg","Média 60d","Desvio"],
-      yRows.slice(0,25).map(x=>[
-        yday,
+      ["Dia","Produto","Fornecedor","R$.KG","Base R$","DIF. R$","Lote"],
+      yRows.slice(0,50).map(x=>[
+        new Date(yday).toLocaleDateString("pt-BR"),
         x.produto,
         x.fornecedor,
         fmtBRL(x.rkg),
-        fmtBRL(x.avg),
-        fmtPctHTML(x.dev)
+        fmtBRL(x.base_r),
+        fmtPctHTML(x.dif_r_pct,1),
+        x.lote || ""
       ]),
-      25
-    ) : "<div class='muted small'>Nenhum item com desvio ≥ 30% (preço/kg) no “dia anterior” dentro da janela.</div>"
+      50
+    ) : "<div class='muted small'>Nenhum item com DIF. R$ fora de ±30% no “dia anterior” dentro da janela.</div>"
   ) : "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
 
-  // 4) Curva ABC por KILO (60d)
+  /* =========================
+     4) Curva ABC por KILO (mantido)
+  ========================= */
   const kiloByProd = new Map();
   for (const r of inWin) {
     if (r.kilo==null) continue;
@@ -515,7 +551,9 @@ function renderDashboard(dataFiltered) {
     25
   ) : "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
 
-  // 5) Pendências NF REC
+  /* =========================
+     5) Pendências NF REC (mantido)
+  ========================= */
   const bad = new Set(["ATUAL","NRC","REC.","REC"]);
   const pend = inWin.filter(x=>{
     const q = (x.qld||"").trim().toUpperCase();
@@ -543,7 +581,7 @@ function renderDashboard(dataFiltered) {
     `Janela 60d: ${winStart.toLocaleDateString("pt-BR")} → ${maxDate.toLocaleDateString("pt-BR")}.`;
 }
 
-// Carrega automaticamente na abertura (opcional). Se preferir manual, comente a linha abaixo.
+// se quiser carregar automaticamente ao abrir, descomente:
 // loadData();
 </script>
 </body>
