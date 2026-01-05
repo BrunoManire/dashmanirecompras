@@ -36,18 +36,23 @@
 
   /* tabelas com scroll interno */
   .tablewrap{
-    max-height:420px;          /* ajuste aqui se quiser mais alto */
-    overflow:auto;             /* vertical + horizontal */
+    max-height:420px;
+    overflow:auto;
     border:1px solid var(--line);
     border-radius:12px;
     background:#0f1520;
   }
-  table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px;} /* min-width força scroll horizontal quando precisar */
+  table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px;}
   th,td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;}
   th{text-align:left;color:var(--muted);font-weight:600;position:sticky;top:0;background:#0f1520;z-index:1;}
   .pos{color:var(--good);} .neg{color:var(--bad);}
   .warn{color:var(--warn);font-weight:700;}
   code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+
+  /* headers clicáveis para ordenação */
+  th.sortable{cursor:pointer; user-select:none;}
+  th.sortable:hover{filter:brightness(1.15);}
+  .sort-ind{margin-left:6px;color:var(--muted);font-size:11px;}
 </style>
 </head>
 <body>
@@ -133,6 +138,7 @@
         Regra: lista linhas onde <b>DIF. R$</b> ≥ +30% ou ≤ −30%, usando colunas:
         <b>PRODUTO</b>, <b>LOTE</b>, <b>DATA</b>, <b>R$.KG</b>, <b>BASE R$</b>, <b>DIF. R$</b>, <b>KILO</b>.
         Se <b>BASE R$</b> vier vazio no CSV, o painel calcula: <code>BASE = R$.KG / (1 + DIF)</code>.
+        Clique nos cabeçalhos para ordenar.
       </div>
       <div class="tablewrap" id="tbl_price"></div>
     </div>
@@ -141,6 +147,7 @@
       <h3 style="margin:0 0 8px 0;">Maior desvio — NEC KGs (Bruno) vs KILO recebido</h3>
       <div class="muted small" style="margin-bottom:10px;">
         Regra: desvio% = (KILO − NEC) ÷ NEC (considera NEC &gt; 0 e KILO preenchido; janela 60 dias).
+        Clique nos cabeçalhos para ordenar.
       </div>
       <div class="tablewrap" id="tbl_kgdev"></div>
     </div>
@@ -149,6 +156,7 @@
       <h3 style="margin:0 0 8px 0;">Dia anterior disponível — desvios ≥ 30% (DIF. R$)</h3>
       <div class="muted small" style="margin-bottom:10px;">
         O dashboard usa a última data do período selecionado e busca a data imediatamente anterior com registros (dentro do período).
+        Clique nos cabeçalhos para ordenar.
       </div>
       <div class="tablewrap" id="tbl_prevday"></div>
     </div>
@@ -157,6 +165,7 @@
       <h3 style="margin:0 0 8px 0;">Curva ABC por KILO</h3>
       <div class="muted small" style="margin-bottom:10px;">
         Base: soma de KILO (janela 60 dias). A: até 80% acumulado, B: até 95%, C: restante.
+        Clique nos cabeçalhos para ordenar.
       </div>
       <div class="tablewrap" id="tbl_abc"></div>
     </div>
@@ -165,6 +174,7 @@
       <h3 style="margin:0 0 8px 0;">Pendências de NF REC. (QLD. ≠ Atual/NRC/Rec.)</h3>
       <div class="muted small" style="margin-bottom:10px;">
         Critério: NF REC. vazio e QLD. diferente de Atual, NRC, Rec. (linhas com QLD vazio não entram).
+        Clique nos cabeçalhos para ordenar.
       </div>
       <div class="tablewrap" id="tbl_nf"></div>
     </div>
@@ -180,6 +190,15 @@ let ALL_DATA = [];
 let MIN_DATE = null;
 let MAX_DATE = null;
 let RAW_HEADER = [];
+
+/* Estado de ordenação por tabela */
+const SORT_STATE = {
+  price:   { key: "abs", dir: "desc" },  // default: maior desvio primeiro
+  kgdev:   { key: "abs", dir: "desc" },
+  prevday: { key: "abs", dir: "desc" },
+  abc:     { key: "kilo", dir: "desc" },
+  nf:      { key: "dataTS", dir: "desc" }
+};
 
 /* =========================
    CSV parser (simples)
@@ -211,13 +230,12 @@ function parseCSV(text){
 
 /* =========================
    Normalização de cabeçalho
-   (mata NBSP, múltiplos espaços, variações de ponto, etc.)
 ========================= */
 function normHeader(s){
   return String(s||"")
-    .replace(/\u00A0/g," ")   // NBSP
+    .replace(/\u00A0/g," ")
     .trim()
-    .replace(/\s+/g," ")     // espaços múltiplos
+    .replace(/\s+/g," ")
     .toUpperCase();
 }
 function makeIndexMap(header){
@@ -292,19 +310,93 @@ function toDate(v){
 function toISO(d){ return d.toISOString().slice(0,10); }
 
 /* =========================
-   Table builder
+   Ordenação + tabela clicável
 ========================= */
-function buildTable(headers, rows){
-  let h="<table><thead><tr>";
-  for(const x of headers) h+=`<th>${x}</th>`;
-  h+="</tr></thead><tbody>";
-  for(const r of rows){
-    h+="<tr>";
-    for(const c of r) h+=`<td>${c}</td>`;
-    h+="</tr>";
+function safeStr(v){ return (v==null) ? "" : String(v); }
+
+function compare(a, b, dir){
+  const mult = (dir === "asc") ? 1 : -1;
+
+  // nulls sempre por último
+  if(a == null && b == null) return 0;
+  if(a == null) return 1;
+  if(b == null) return -1;
+
+  // number
+  if(typeof a === "number" && typeof b === "number"){
+    if(!isFinite(a) && !isFinite(b)) return 0;
+    if(!isFinite(a)) return 1;
+    if(!isFinite(b)) return -1;
+    return (a - b) * mult;
   }
-  h+="</tbody></table>";
-  return h;
+
+  // date timestamp
+  if(typeof a === "bigint" || typeof b === "bigint"){
+    const aa = BigInt(a), bb = BigInt(b);
+    return (aa > bb ? 1 : aa < bb ? -1 : 0) * mult;
+  }
+
+  // string fallback
+  const sa = safeStr(a).toUpperCase();
+  const sb = safeStr(b).toUpperCase();
+  if(sa === sb) return 0;
+  return (sa > sb ? 1 : -1) * mult;
+}
+
+/**
+ * Renderiza tabela com cabeçalhos clicáveis.
+ * - tableId: chave do SORT_STATE ("price","kgdev","prevday","abc","nf")
+ * - mountId: elemento container (div.tablewrap)
+ * - cols: [{label, key, type}]  type: "text"|"num"|"pct"|"brl"|"date"
+ * - rows: array de objetos já preparados (com campos numéricos para ordenar)
+ * - rowToCells: (r)=> array de strings HTML para <td>
+ */
+function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
+  const state = SORT_STATE[tableId] || { key: cols[0]?.key, dir: "asc" };
+  SORT_STATE[tableId] = state;
+
+  // ordena
+  const sorted = [...rows].sort((r1, r2) => compare(r1[state.key], r2[state.key], state.dir));
+
+  // header
+  let html = `<table><thead><tr>`;
+  for(const c of cols){
+    const active = (c.key === state.key);
+    const ind = active ? (state.dir === "asc" ? "▲" : "▼") : "";
+    html += `<th class="sortable" data-t="${tableId}" data-k="${c.key}">
+               ${c.label}<span class="sort-ind">${ind}</span>
+             </th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  for(const r of sorted){
+    const tds = rowToCells(r);
+    html += `<tr>${tds.map(x=>`<td>${x}</td>`).join("")}</tr>`;
+  }
+  html += `</tbody></table>`;
+
+  const mount = document.getElementById(mountId);
+  mount.innerHTML = html;
+
+  // bind clicks
+  mount.querySelectorAll("th.sortable").forEach(th=>{
+    th.addEventListener("click", ()=>{
+      const t = th.getAttribute("data-t");
+      const k = th.getAttribute("data-k");
+      const st = SORT_STATE[t] || { key:k, dir:"asc" };
+
+      if(st.key === k){
+        st.dir = (st.dir === "asc") ? "desc" : "asc";
+      } else {
+        st.key = k;
+        st.dir = "asc"; // ao trocar coluna, começa asc
+      }
+      SORT_STATE[t] = st;
+
+      // re-render do dashboard inteiro (mantém consistência)
+      renderDashboard(filterBySelectedDates(ALL_DATA));
+    });
+  });
 }
 
 /* =========================
@@ -392,15 +484,14 @@ async function loadData(){
   const cData = colAny(idx, ["DATA"]);
   const cProd = colAny(idx, ["PRODUTO"]);
   const cForn = colAny(idx, ["FORNECEDOR"]);
-  const cNec  = colAny(idx, ["NEC KGS (BRUNO)","KGS (BRL)"]); // use o que existir
+  const cNec  = colAny(idx, ["NEC KGS (BRUNO)","KGS (BRL)"]);
   const cKilo = colAny(idx, ["KILO"]);
   const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG"]);
   const cRtot = colAny(idx, ["R$.TOTAL","R$ TOTAL","R$TOTAL","R$. TOTAL"]);
   const cNF   = colAny(idx, ["NF REC.","NF REC"]);
   const cQLD  = colAny(idx, ["QLD.","QLD"]);
 
-  // IMPORTANTÍSSIMO: Base e Dif por NOME (sem depender de AJ/AK)
-  // Pelo seu print, "BASE R$" pode estar em AK e "DIF. R$" logo após.
+  // Base e Dif por NOME
   const cBase = colAny(idx, ["BASE R$","BASE R","BASE RS","BASE R$ ","BASE R$  ","BASE"]);
   const cDif  = colAny(idx, ["DIF. R$","DIF R$","DIF. RS","DIF RS","DIF. R","DIF R"]);
 
@@ -415,7 +506,6 @@ async function loadData(){
     let base  = cBase!=null ? toNum(r[cBase]) : null;
 
     // fallback: calcula BASE se veio nulo mas temos R$.KG e DIF
-    // BASE = R$.KG / (1 + DIF)
     if((base==null || !isFinite(base)) && rkg!=null && isFinite(rkg) && dif!=null && isFinite(dif) && (1+dif) !== 0){
       base = rkg / (1 + dif);
     }
@@ -423,6 +513,7 @@ async function loadData(){
     return {
       data:d,
       dataISO: d ? toISO(d) : null,
+      dataTS: d ? d.getTime() : null,
       lote: cLote!=null ? String(r[cLote]||"").trim() : "",
       produto,
       fornecedor: cForn!=null ? String(r[cForn]||"").trim() : "",
@@ -470,7 +561,9 @@ function renderDashboard(dataFiltered){
   document.getElementById("kpi_lastdate").textContent = selMax ? `até ${selMax.toLocaleDateString("pt-BR")}` : "—";
   document.getElementById("kpi_missing").textContent = inWin.length ? `KILO ausente: ${(kiloMissing*100).toFixed(1)}%` : "—";
 
-  // 1) ALERTAS DIF. R$ fora ±30% (com Base R$ real ou calculada)
+  /* =========================
+     1) ALERTAS DIF. R$ fora ±30%
+  ========================= */
   const priceAlerts = inWin
     .filter(x => x.dif_r_pct != null && isFinite(x.dif_r_pct))
     .filter(x => Math.abs(x.dif_r_pct) >= 0.30)
@@ -478,11 +571,19 @@ function renderDashboard(dataFiltered){
       const impacto = (x.kilo!=null && x.rkg!=null && x.base_r!=null)
         ? (x.rkg - x.base_r) * x.kilo
         : null;
-      return {...x, impacto, abs: Math.abs(x.dif_r_pct)};
-    })
-    .sort((a,b)=>b.abs-a.abs);
+      return {
+        ...x,
+        impacto,
+        abs: Math.abs(x.dif_r_pct),
+        rkg_num: (x.rkg!=null && isFinite(x.rkg)) ? x.rkg : null,
+        base_num: (x.base_r!=null && isFinite(x.base_r)) ? x.base_r : null,
+        dif_num: (x.dif_r_pct!=null && isFinite(x.dif_r_pct)) ? x.dif_r_pct : null,
+        kilo_num: (x.kilo!=null && isFinite(x.kilo)) ? x.kilo : null,
+        impacto_num: (impacto!=null && isFinite(impacto)) ? impacto : null,
+        dataTS: x.data ? x.data.getTime() : null
+      };
+    });
 
-  // sanity: se base está faltando demais, avisar
   const baseMissingPct = priceAlerts.length
     ? (priceAlerts.filter(x=>x.base_r==null || !isFinite(x.base_r)).length / priceAlerts.length)
     : 0;
@@ -494,46 +595,93 @@ function renderDashboard(dataFiltered){
        </div>`
     : "";
 
-  document.getElementById("tbl_price").innerHTML = priceAlerts.length
-    ? (warnBase + buildTable(
-        ["Produto","Lote","Data","R$.KG","Base R$","DIF. R$","KILO","Impacto (R$)"],
-        priceAlerts.map(x=>[
-          x.produto,
-          x.lote || "",
-          x.data ? x.data.toLocaleDateString("pt-BR") : "",
-          fmtBRL(x.rkg),
-          fmtBRL(x.base_r),
-          fmtPctHTML(x.dif_r_pct,1),
-          fmtNum(x.kilo,2),
-          x.impacto==null ? "—" : fmtBRL(x.impacto)
-        ])
-      ))
-    : "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
+  if(priceAlerts.length){
+    const cols = [
+      { label:"Produto",        key:"produto" },
+      { label:"Lote",           key:"lote" },
+      { label:"Data",           key:"dataTS" },
+      { label:"R$.KG",          key:"rkg_num" },
+      { label:"Base R$",        key:"base_num" },
+      { label:"DIF. R$",        key:"dif_num" },
+      { label:"KILO",           key:"kilo_num" },
+      { label:"Impacto (R$)",   key:"impacto_num" }
+    ];
 
-  // 2) Desvio NEC vs KILO
+    // injeta aviso e tabela
+    document.getElementById("tbl_price").innerHTML = warnBase + `<div id="tbl_price_inner"></div>`;
+
+    renderSortableTable(
+      "price",
+      "tbl_price_inner",
+      cols,
+      priceAlerts,
+      (x)=>[
+        x.produto,
+        x.lote || "",
+        x.data ? x.data.toLocaleDateString("pt-BR") : "",
+        fmtBRL(x.rkg),
+        fmtBRL(x.base_r),
+        fmtPctHTML(x.dif_r_pct,1),
+        fmtNum(x.kilo,2),
+        (x.impacto==null ? "—" : fmtBRL(x.impacto))
+      ]
+    );
+  } else {
+    document.getElementById("tbl_price").innerHTML =
+      "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
+  }
+
+  /* =========================
+     2) Desvio NEC vs KILO
+  ========================= */
   const kgdev=[];
   for(const r of inWin){
     if(r.nec==null || r.nec===0 || r.kilo==null) continue;
     const dev=(r.kilo-r.nec)/r.nec;
-    kgdev.push({...r, dev, abs: Math.abs(dev)});
+    kgdev.push({
+      ...r,
+      dev,
+      abs: Math.abs(dev),
+      dev_num: dev,
+      abs_num: Math.abs(dev),
+      nec_num: r.nec,
+      kilo_num: r.kilo,
+      dataTS: r.data ? r.data.getTime() : null
+    });
   }
-  kgdev.sort((a,b)=>b.abs-a.abs);
 
-  document.getElementById("tbl_kgdev").innerHTML = kgdev.length
-    ? buildTable(
-        ["Data","Produto","Fornecedor","NEC","KILO","Desvio"],
-        kgdev.map(x=>[
-          x.data ? x.data.toLocaleDateString("pt-BR") : "",
-          x.produto,
-          x.fornecedor,
-          fmtNum(x.nec,2),
-          fmtNum(x.kilo,2),
-          fmtPctHTML(x.dev,1)
-        ])
-      )
-    : "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
+  if(kgdev.length){
+    const cols = [
+      { label:"Data",      key:"dataTS" },
+      { label:"Produto",   key:"produto" },
+      { label:"Fornecedor",key:"fornecedor" },
+      { label:"NEC",       key:"nec_num" },
+      { label:"KILO",      key:"kilo_num" },
+      { label:"Desvio",    key:"dev_num" }
+    ];
 
-  // 3) Dia anterior — usando DIF. R$ fora ±30%
+    renderSortableTable(
+      "kgdev",
+      "tbl_kgdev",
+      cols,
+      kgdev,
+      (x)=>[
+        x.data ? x.data.toLocaleDateString("pt-BR") : "",
+        x.produto,
+        x.fornecedor,
+        fmtNum(x.nec,2),
+        fmtNum(x.kilo,2),
+        fmtPctHTML(x.dev,1)
+      ]
+    );
+  } else {
+    document.getElementById("tbl_kgdev").innerHTML =
+      "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
+  }
+
+  /* =========================
+     3) Dia anterior — DIF. R$ fora ±30%
+  ========================= */
   const uniqueDates = Array.from(new Set(inWin.map(x=>x.dataISO).filter(Boolean))).sort();
   const yday = uniqueDates.length>1 ? uniqueDates[uniqueDates.length-2] : null;
   document.getElementById("kpi_prevdate").textContent = yday ? `dia ant.: ${new Date(yday).toLocaleDateString("pt-BR")}` : "dia ant.: —";
@@ -543,33 +691,68 @@ function renderDashboard(dataFiltered){
     yRows = inWin
       .filter(x=>x.dataISO===yday && x.dif_r_pct!=null && isFinite(x.dif_r_pct))
       .filter(x=>Math.abs(x.dif_r_pct)>=0.30)
-      .sort((a,b)=>Math.abs(b.dif_r_pct)-Math.abs(a.dif_r_pct));
+      .map(x=>{
+        const impacto = (x.kilo!=null && x.rkg!=null && x.base_r!=null)
+          ? (x.rkg - x.base_r) * x.kilo
+          : null;
+        return {
+          ...x,
+          abs: Math.abs(x.dif_r_pct),
+          dataTS: x.data ? x.data.getTime() : null,
+          rkg_num: x.rkg,
+          base_num: x.base_r,
+          dif_num: x.dif_r_pct,
+          impacto_num: impacto,
+          kilo_num: x.kilo
+        };
+      });
   }
 
-  document.getElementById("tbl_prevday").innerHTML = yday
-    ? (yRows.length
-        ? buildTable(
-            ["Dia","Produto","Fornecedor","R$.KG","Base R$","DIF. R$","Lote"],
-            yRows.map(x=>[
-              new Date(yday).toLocaleDateString("pt-BR"),
-              x.produto,
-              x.fornecedor,
-              fmtBRL(x.rkg),
-              fmtBRL(x.base_r),
-              fmtPctHTML(x.dif_r_pct,1),
-              x.lote||""
-            ])
-          )
-        : "<div class='muted small'>Nenhum item com DIF. R$ fora de ±30% no “dia anterior”.</div>")
-    : "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
+  if(yday){
+    if(yRows.length){
+      const cols = [
+        { label:"Dia",        key:"dataTS" },
+        { label:"Produto",    key:"produto" },
+        { label:"Fornecedor", key:"fornecedor" },
+        { label:"R$.KG",      key:"rkg_num" },
+        { label:"Base R$",    key:"base_num" },
+        { label:"DIF. R$",    key:"dif_num" },
+        { label:"Lote",       key:"lote" }
+      ];
 
-  // 4) Curva ABC por KILO
+      renderSortableTable(
+        "prevday",
+        "tbl_prevday",
+        cols,
+        yRows,
+        (x)=>[
+          x.data ? x.data.toLocaleDateString("pt-BR") : "",
+          x.produto,
+          x.fornecedor,
+          fmtBRL(x.rkg),
+          fmtBRL(x.base_r),
+          fmtPctHTML(x.dif_r_pct,1),
+          x.lote || ""
+        ]
+      );
+    } else {
+      document.getElementById("tbl_prevday").innerHTML =
+        "<div class='muted small'>Nenhum item com DIF. R$ fora de ±30% no “dia anterior”.</div>";
+    }
+  } else {
+    document.getElementById("tbl_prevday").innerHTML =
+      "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
+  }
+
+  /* =========================
+     4) Curva ABC por KILO
+  ========================= */
   const kiloByProd=new Map();
   for(const r of inWin){
     if(r.kilo==null) continue;
     kiloByProd.set(r.produto,(kiloByProd.get(r.produto)||0)+r.kilo);
   }
-  const abc=Array.from(kiloByProd.entries()).map(([produto,kilo])=>({produto,kilo}));
+  const abc=Array.from(kiloByProd.entries()).map(([produto,kilo])=>({produto,kilo, kilo_num:kilo}));
   abc.sort((a,b)=>b.kilo-a.kilo);
   const totalK = abc.reduce((s,x)=>s+x.kilo,0) || 1;
 
@@ -578,40 +761,77 @@ function renderDashboard(dataFiltered){
     acc += x.kilo;
     const accPct=acc/totalK;
     const cls = accPct<=0.8 ? "A" : (accPct<=0.95 ? "B" : "C");
-    return {...x, accPct, cls};
+    return {
+      ...x,
+      accPct,
+      cls,
+      acc_num: accPct
+    };
   });
 
-  document.getElementById("tbl_abc").innerHTML = abcRows.length
-    ? buildTable(
-        ["Produto","KILO (60d)","% acum.","Classe"],
-        abcRows.map(x=>[
-          x.produto,
-          fmtNum(x.kilo,0),
-          fmtPctHTML(x.accPct,1),
-          x.cls
-        ])
-      )
-    : "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
+  if(abcRows.length){
+    const cols = [
+      { label:"Produto",  key:"produto" },
+      { label:"KILO (60d)", key:"kilo_num" },
+      { label:"% acum.",  key:"acc_num" },
+      { label:"Classe",   key:"cls" }
+    ];
 
-  // 5) Pendências NF REC
+    renderSortableTable(
+      "abc",
+      "tbl_abc",
+      cols,
+      abcRows,
+      (x)=>[
+        x.produto,
+        fmtNum(x.kilo,0),
+        fmtPctHTML(x.accPct,1),
+        x.cls
+      ]
+    );
+  } else {
+    document.getElementById("tbl_abc").innerHTML =
+      "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
+  }
+
+  /* =========================
+     5) Pendências NF REC
+  ========================= */
   const bad=new Set(["ATUAL","NRC","REC.","REC"]);
   const pend=inWin.filter(x=>{
     const q=(x.qld||"").trim().toUpperCase();
     return (!x.nf) && q && !bad.has(q);
-  });
+  }).map(x=>({
+    ...x,
+    dataTS: x.data ? x.data.getTime() : null
+  }));
 
-  document.getElementById("tbl_nf").innerHTML = pend.length
-    ? buildTable(
-        ["Data","Produto","Fornecedor","QLD.","NF REC."],
-        pend.map(x=>[
-          x.data ? x.data.toLocaleDateString("pt-BR") : "",
-          x.produto,
-          x.fornecedor,
-          x.qld||"",
-          x.nf||""
-        ])
-      )
-    : "<div class='muted small'>Sem pendências de NF REC (com QLD válido) na janela de 60 dias.</div>";
+  if(pend.length){
+    const cols = [
+      { label:"Data",      key:"dataTS" },
+      { label:"Produto",   key:"produto" },
+      { label:"Fornecedor",key:"fornecedor" },
+      { label:"QLD.",      key:"qld" },
+      { label:"NF REC.",   key:"nf" }
+    ];
+
+    renderSortableTable(
+      "nf",
+      "tbl_nf",
+      cols,
+      pend,
+      (x)=>[
+        x.data ? x.data.toLocaleDateString("pt-BR") : "",
+        x.produto,
+        x.fornecedor,
+        x.qld||"",
+        x.nf||""
+      ]
+    );
+  } else {
+    document.getElementById("tbl_nf").innerHTML =
+      "<div class='muted small'>Sem pendências de NF REC (com QLD válido) na janela de 60 dias.</div>";
+  }
 
   const rangeTxt = selMin && selMax
     ? `Período: ${selMin.toLocaleDateString("pt-BR")} → ${selMax.toLocaleDateString("pt-BR")}`
