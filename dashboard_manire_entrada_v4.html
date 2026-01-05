@@ -127,11 +127,46 @@
     outline:2px solid rgba(245,194,17,.25);
     border-color:rgba(245,194,17,.55);
   }
+  /* MENU (hambúrguer) */
+.hambtn{
+  width:42px;height:42px;border-radius:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:#0f1520;color:var(--text);cursor:pointer;
+}
+.hambtn:hover{filter:brightness(1.08);}
+.drawerMask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:50;}
+.drawer{position:fixed;top:0;left:0;height:100%;width:min(320px,88vw);
+  background:#0f1520;border-right:1px solid var(--line);
+  transform:translateX(-102%);transition:transform .18s ease;z-index:60;padding:14px;
+}
+.drawer.open{transform:translateX(0);}
+.drawerMask.open{display:block;}
+.drawer h2{margin:6px 0 10px 0;font-size:14px;}
+.navlink{display:block;padding:10px 10px;border-radius:10px;border:1px solid transparent;color:var(--text);text-decoration:none;}
+.navlink:hover{border-color:var(--line);background:#111826;}
+.pill{display:inline-block;margin-top:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px;}
+
 </style>
 </head>
 <body>
+<div id="drawerMask" class="drawerMask" onclick="closeDrawer()"></div>
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <h2>Navegação</h2>
+    <button class="hambtn" type="button" onclick="closeDrawer()" title="Fechar">✕</button>
+  </div>
+
+  <div class="muted small">O período e o CSV são compartilhados entre páginas.</div>
+
+  <a class="navlink" href="./dashboard_manire_entrada_v4.html"><b>Dashboard — Entradas In Natura</b></a>
+  <a class="navlink" href="./dashboard_reuniao_semanal_v1.html">Reunião Semanal</a>
+
+  <div class="pill" id="pillPeriod">Período: —</div>
+</aside>
 
 <header>
+  <button class="hambtn" type="button" onclick="openDrawer()" title="Menu">☰</button>
+
   <!-- Botão do menu (☰) -->
   <button class="hambtn" type="button" onclick="openDrawer()" aria-label="Abrir menu">☰</button>
 
@@ -548,10 +583,57 @@ function filterBySelectedDates(data){
   return data.filter(x=>x.data && x.data>=s && x.data<=e);
 }
 function applyDateFilter(){
+  saveSharedState();
+
   if(!ALL_DATA.length){ alert("Carregue o CSV primeiro (Atualizar)."); return; }
   document.getElementById("kpi_range").textContent =
     `${new Date(document.getElementById("dateStart").value).toLocaleDateString("pt-BR")} → ${new Date(document.getElementById("dateEnd").value).toLocaleDateString("pt-BR")}`;
   renderDashboard(filterBySelectedDates(ALL_DATA));
+}
+const LS_CSV  = "manire_csvUrl";
+const LS_S0   = "manire_dateStart";
+const LS_S1   = "manire_dateEnd";
+
+function openDrawer(){
+  document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawerMask").classList.add("open");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+}
+function closeDrawer(){
+  document.getElementById("drawer").classList.remove("open");
+  document.getElementById("drawerMask").classList.remove("open");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
+}
+
+function updateDrawerPill(){
+  const s0 = document.getElementById("dateStart").value;
+  const s1 = document.getElementById("dateEnd").value;
+  const pill = document.getElementById("pillPeriod");
+  if(!pill) return;
+  if(s0 && s1){
+    pill.textContent = `Período: ${new Date(s0).toLocaleDateString("pt-BR")} → ${new Date(s1).toLocaleDateString("pt-BR")}`;
+  } else {
+    pill.textContent = "Período: —";
+  }
+}
+
+function saveSharedState(){
+  localStorage.setItem(LS_CSV, document.getElementById("csvUrl").value.trim());
+  localStorage.setItem(LS_S0, document.getElementById("dateStart").value || "");
+  localStorage.setItem(LS_S1, document.getElementById("dateEnd").value || "");
+  updateDrawerPill();
+}
+
+function loadSharedStateDefaults(){
+  const defCsv = localStorage.getItem(LS_CSV) || "";
+  const defS0  = localStorage.getItem(LS_S0) || "";
+  const defS1  = localStorage.getItem(LS_S1) || "";
+
+  if(defCsv) document.getElementById("csvUrl").value = defCsv;
+  if(defS0) document.getElementById("dateStart").value = defS0;
+  if(defS1) document.getElementById("dateEnd").value = defS1;
+
+  updateDrawerPill();
 }
 
 /* =========================
@@ -568,6 +650,8 @@ async function loadData(){
   });
   document.getElementById("dbg_cols").textContent="—";
   document.getElementById("dbg_lastcols").textContent="—";
+  saveSharedState();
+
 
   let raw;
   try{
@@ -958,6 +1042,8 @@ function renderDashboard(dataFiltered){
     `OK — ${fmtNum(linhas,0)} linhas (período selecionado). ${rangeTxt}. ` +
     `Janela 60d: ${winStart.toLocaleDateString("pt-BR")} → ${maxDate.toLocaleDateString("pt-BR")}.`;
 }
+  loadSharedStateDefaults();
+
 
 // Se quiser carregar automaticamente ao abrir, descomente:
 // window.addEventListener("load", loadData);
