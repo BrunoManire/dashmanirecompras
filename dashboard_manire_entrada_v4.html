@@ -5,42 +5,53 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Manirê | Dashboard Entradas In Natura</title>
 <style>
-  :root {
+  :root{
     --bg:#0b0f14; --card:#111826; --text:#e7eef7; --muted:#9db0c5; --line:#223044;
     --good:#26a269; --bad:#e01b24; --warn:#f5c211;
   }
-  body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:18px 20px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; }
-  header h1 { font-size:18px; margin:0; }
-  .muted { color:var(--muted); }
-  .small { font-size:11px; }
-  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-  input[type="text"] { width:min(900px, 92vw); padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1520; color:var(--text); }
-  .datebox { display:flex; flex-direction:column; gap:4px; }
-  .datebox input[type="date"] { padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1520; color:var(--text); }
-  button { padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#182234; color:var(--text); cursor:pointer; }
-  button:hover { filter:brightness(1.08); }
-  main { padding:18px 20px 28px; }
-  .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
-  .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; } .span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
-  @media (max-width: 1100px) {
-    .span-3,.span-4,.span-5,.span-6,.span-7,.span-8 { grid-column: span 12; }
-    input[type="text"]{ width:min(100%, 92vw); }
+  body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;}
+  header h1{font-size:18px;margin:0;}
+  .muted{color:var(--muted);}
+  .small{font-size:11px;}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  input[type="text"]{width:min(900px,92vw);padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1520;color:var(--text);}
+  .datebox{display:flex;flex-direction:column;gap:4px;}
+  .datebox input[type="date"]{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1520;color:var(--text);}
+  button{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#182234;color:var(--text);cursor:pointer;}
+  button:hover{filter:brightness(1.08);}
+  main{padding:18px 20px 28px;}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .span-3{grid-column:span 3;} .span-4{grid-column:span 4;} .span-5{grid-column:span 5;}
+  .span-6{grid-column:span 6;} .span-7{grid-column:span 7;} .span-8{grid-column:span 8;} .span-12{grid-column:span 12;}
+  @media (max-width:1100px){
+    .span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12;}
+    input[type="text"]{width:min(100%,92vw);}
   }
-  .kpi { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
-  .kpi .val { font-size:22px; font-weight:700; }
-  .kpi .lbl { color:var(--muted); font-size:12px; }
-  .tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
-  table { width:100%; border-collapse:collapse; font-size:12px; }
-  th, td { padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { text-align:left; color:var(--muted); font-weight:600; }
-  .pos { color:var(--good); } .neg { color:var(--bad); }
-  .warn { color:var(--warn); font-weight:700; }
-  pre { white-space:pre-wrap; margin:0; font-size:12px; color:#cfe0f5; }
+  .kpi{display:flex;justify-content:space-between;gap:10px;align-items:baseline;}
+  .kpi .val{font-size:22px;font-weight:700;}
+  .kpi .lbl{color:var(--muted);font-size:12px;}
+  .tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
+
+  /* tabelas com scroll interno */
+  .tablewrap{
+    max-height:420px;          /* ajuste aqui se quiser mais alto */
+    overflow:auto;             /* vertical + horizontal */
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#0f1520;
+  }
+  table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px;} /* min-width força scroll horizontal quando precisar */
+  th,td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;}
+  th{text-align:left;color:var(--muted);font-weight:600;position:sticky;top:0;background:#0f1520;z-index:1;}
+  .pos{color:var(--good);} .neg{color:var(--bad);}
+  .warn{color:var(--warn);font-weight:700;}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
 </style>
 </head>
 <body>
+
 <header>
   <div style="flex:1 1 auto;">
     <h1>Dashboard — Entradas In Natura (Manirê)</h1>
@@ -68,6 +79,7 @@
 
 <main>
   <div class="grid">
+
     <div class="card span-3">
       <div class="kpi">
         <div>
@@ -108,13 +120,21 @@
       </div>
     </div>
 
-    <div class="card span-6">
-      <h3 style="margin:0 0 8px 0;">Maiores desvios de preço — DIF. R$ (AK) fora de ±30%</h3>
-      <div class="muted small" style="margin-bottom:10px;">
-        Regra: lista linhas onde <b>DIF. R$</b> ≥ +30% ou ≤ −30%, usando colunas do Sheets:
-        PRODUTO (D), LOTE (A), DATA (C), R$.KG (U), BASE R$ (AJ), DIF. R$ (AK).
+    <div class="card span-12">
+      <div class="muted small">
+        <b>DEBUG (automático):</b> <span id="dbg_cols">—</span><br/>
+        <span id="dbg_lastcols">—</span>
       </div>
-      <div id="tbl_price"></div>
+    </div>
+
+    <div class="card span-6">
+      <h3 style="margin:0 0 8px 0;">Maiores desvios de preço — DIF. R$ fora de ±30%</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Regra: lista linhas onde <b>DIF. R$</b> ≥ +30% ou ≤ −30%, usando colunas:
+        <b>PRODUTO</b>, <b>LOTE</b>, <b>DATA</b>, <b>R$.KG</b>, <b>BASE R$</b>, <b>DIF. R$</b>, <b>KILO</b>.
+        Se <b>BASE R$</b> vier vazio no CSV, o painel calcula: <code>BASE = R$.KG / (1 + DIF)</code>.
+      </div>
+      <div class="tablewrap" id="tbl_price"></div>
     </div>
 
     <div class="card span-6">
@@ -122,15 +142,15 @@
       <div class="muted small" style="margin-bottom:10px;">
         Regra: desvio% = (KILO − NEC) ÷ NEC (considera NEC &gt; 0 e KILO preenchido; janela 60 dias).
       </div>
-      <div id="tbl_kgdev"></div>
+      <div class="tablewrap" id="tbl_kgdev"></div>
     </div>
 
     <div class="card span-7">
-      <h3 style="margin:0 0 8px 0;">Dia anterior disponível — itens com DIF. R$ fora de ±30%</h3>
+      <h3 style="margin:0 0 8px 0;">Dia anterior disponível — desvios ≥ 30% (DIF. R$)</h3>
       <div class="muted small" style="margin-bottom:10px;">
         O dashboard usa a última data do período selecionado e busca a data imediatamente anterior com registros (dentro do período).
       </div>
-      <div id="tbl_prevday"></div>
+      <div class="tablewrap" id="tbl_prevday"></div>
     </div>
 
     <div class="card span-5">
@@ -138,7 +158,7 @@
       <div class="muted small" style="margin-bottom:10px;">
         Base: soma de KILO (janela 60 dias). A: até 80% acumulado, B: até 95%, C: restante.
       </div>
-      <div id="tbl_abc"></div>
+      <div class="tablewrap" id="tbl_abc"></div>
     </div>
 
     <div class="card span-12">
@@ -146,17 +166,7 @@
       <div class="muted small" style="margin-bottom:10px;">
         Critério: NF REC. vazio e QLD. diferente de Atual, NRC, Rec. (linhas com QLD vazio não entram).
       </div>
-      <div id="tbl_nf"></div>
-    </div>
-
-    <!-- DEBUG CARD (crítico para resolver AJ/AK) -->
-    <div class="card span-12">
-      <h3 style="margin:0 0 8px 0;">DEBUG — Estrutura do CSV</h3>
-      <div class="muted small" style="margin-bottom:10px;">
-        Aqui você enxerga o que realmente chegou do CSV (contagem de colunas, nomes finais e amostra AJ/AK).
-        Se <b>Total de colunas</b> for menor que 37, o CSV não está exportando até AJ/AK.
-      </div>
-      <pre id="dbg">—</pre>
+      <div class="tablewrap" id="tbl_nf"></div>
     </div>
 
   </div>
@@ -169,322 +179,273 @@
 let ALL_DATA = [];
 let MIN_DATE = null;
 let MAX_DATE = null;
+let RAW_HEADER = [];
 
 /* =========================
-   CSV parser
+   CSV parser (simples)
 ========================= */
-function parseCSV(text) {
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let inQuotes = false;
+function parseCSV(text){
+  const rows=[];
+  let row=[], cell="", inQuotes=false;
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') {
-      if (inQuotes && text[i+1] === '"') { cell += '"'; i++; }
-      else { inQuotes = !inQuotes; }
-    } else if (c === ',' && !inQuotes) {
-      row.push(cell);
-      cell = "";
-    } else if ((c === '\n' || c === '\r') && !inQuotes) {
-      if (c === '\r' && text[i+1] === '\n') i++;
-      row.push(cell);
-      cell = "";
-      if (row.some(x => (x||"").trim() !== "")) rows.push(row);
-      row = [];
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c === '"'){
+      if(inQuotes && text[i+1] === '"'){ cell+='"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if(c === ',' && !inQuotes){
+      row.push(cell); cell="";
+    } else if((c === '\n' || c === '\r') && !inQuotes){
+      if(c === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); cell="";
+      if(row.some(x => String(x||"").trim() !== "")) rows.push(row);
+      row=[];
     } else {
       cell += c;
     }
   }
   row.push(cell);
-  if (row.some(x => (x||"").trim() !== "")) rows.push(row);
+  if(row.some(x => String(x||"").trim() !== "")) rows.push(row);
   return rows;
 }
 
 /* =========================
-   Format
+   Normalização de cabeçalho
+   (mata NBSP, múltiplos espaços, variações de ponto, etc.)
 ========================= */
-function fmtBRL(x) {
-  if (x == null || !isFinite(x)) return "—";
-  return x.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-function fmtNum(x, d=2) {
-  if (x == null || !isFinite(x)) return "—";
-  return x.toLocaleString("pt-BR", { maximumFractionDigits: d });
-}
-function fmtPctHTML(x, d=1) {
-  if (x == null || !isFinite(x)) return "—";
-  const v = x*100;
-  const s = v.toFixed(d) + "%";
-  return `<span class="${x>=0?'pos':'neg'}">${s}</span>`;
-}
-
-/* =========================
-   Parsing helpers
-========================= */
-function toNum(v) {
-  if (v == null) return null;
-  const s = String(v).trim();
-  if (!s) return null;
-  const clean = s
-    .replace(/\u00A0/g, " ")     // NBSP
-    .replace(/\s/g,'')
-    .replace(/R\$/g,'')
-    .replace(/\./g,'')
-    .replace(',', '.')
-    .replace(/[^\d.-]/g,'');
-  const n = Number(clean);
-  return isFinite(n) ? n : null;
-}
-function toPct(v) {
-  if (v == null) return null;
-  const s = String(v).trim();
-  if (!s) return null;
-  const hasPct = s.includes("%");
-  let n = toNum(s);
-  if (n == null) return null;
-  if (hasPct || Math.abs(n) > 1) n = n / 100;
-  return n;
-}
-function toDate(v) {
-  if (!v) return null;
-  const s = String(v).trim();
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
-  const d = new Date(s);
-  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-function toISO(date) { return date.toISOString().slice(0,10); }
-
-/* =========================
-   Tables
-========================= */
-function buildTable(headers, rows, max=25) {
-  const safe = rows.slice(0, max);
-  let h = "<table><thead><tr>";
-  for (const x of headers) h += `<th>${x}</th>`;
-  h += "</tr></thead><tbody>";
-  for (const r of safe) {
-    h += "<tr>";
-    for (const c of r) h += `<td>${c}</td>`;
-    h += "</tr>";
-  }
-  h += "</tbody></table>";
-  return h;
-}
-
-/* =========================
-   Header normalization + column search
-========================= */
-function normKey(s) {
-  return String(s || "")
-    .replace(/\u00A0/g, " ")           // NBSP
+function normHeader(s){
+  return String(s||"")
+    .replace(/\u00A0/g," ")   // NBSP
     .trim()
-    .toUpperCase()
-    .replace(/\s+/g, " ")              // colapsa espaços
-    .replace(/[.]/g, "")               // remove pontos
-    .replace(/\$/g, "$")               // mantém $
-    ;
+    .replace(/\s+/g," ")     // espaços múltiplos
+    .toUpperCase();
 }
-function makeIndexMap(header) {
-  const m = new Map();
-  header.forEach((h, i) => {
-    const k = normKey(h);
-    if (!m.has(k)) m.set(k, i); // se repetir, mantém o primeiro
+function makeIndexMap(header){
+  const idx = new Map();
+  header.forEach((h,i)=>{
+    const key = normHeader(h);
+    if(key && !idx.has(key)) idx.set(key,i);
   });
-  return m;
+  return idx;
 }
-function colAny(idxMap, candidates) {
-  for (const c of candidates) {
-    const i = idxMap.get(normKey(c));
-    if (i != null) return i;
+function colAny(idx, candidates){
+  for(const c of candidates){
+    const k = normHeader(c);
+    if(idx.has(k)) return idx.get(k);
   }
   return null;
 }
 
 /* =========================
+   Format
+========================= */
+function fmtBRL(x){
+  if(x==null || !isFinite(x)) return "—";
+  return x.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+}
+function fmtNum(x,d=2){
+  if(x==null || !isFinite(x)) return "—";
+  return x.toLocaleString("pt-BR",{maximumFractionDigits:d});
+}
+function fmtPctHTML(x,d=1){
+  if(x==null || !isFinite(x)) return "—";
+  const v=x*100;
+  const s=v.toFixed(d)+"%";
+  return `<span class="${x>=0?'pos':'neg'}">${s}</span>`;
+}
+
+/* =========================
+   Parsing numérico e data
+========================= */
+function toNum(v){
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(!s) return null;
+  const clean = s
+    .replace(/\u00A0/g," ")
+    .replace(/\s/g,"")
+    .replace(/R\$/gi,"")
+    .replace(/\./g,"")
+    .replace(",",".")
+    .replace(/[^\d.-]/g,"");
+  const n=Number(clean);
+  return isFinite(n)?n:null;
+}
+function toPct(v){
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(!s) return null;
+  const hasPct = s.includes("%");
+  let n = toNum(s);
+  if(n==null) return null;
+  if(hasPct || Math.abs(n)>1) n = n/100;
+  return n;
+}
+function toDate(v){
+  if(!v) return null;
+  const s=String(v).trim();
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+  const d=new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function toISO(d){ return d.toISOString().slice(0,10); }
+
+/* =========================
+   Table builder
+========================= */
+function buildTable(headers, rows){
+  let h="<table><thead><tr>";
+  for(const x of headers) h+=`<th>${x}</th>`;
+  h+="</tr></thead><tbody>";
+  for(const r of rows){
+    h+="<tr>";
+    for(const c of r) h+=`<td>${c}</td>`;
+    h+="</tr>";
+  }
+  h+="</tbody></table>";
+  return h;
+}
+
+/* =========================
    Date filter helpers
 ========================= */
-function setDateInputsFromData(data) {
-  const ds = data.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
-  if (!ds.length) return;
+function setDateInputsFromData(data){
+  const ds=data.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
+  if(!ds.length) return;
 
-  MIN_DATE = ds[0];
-  MAX_DATE = ds[ds.length-1];
+  MIN_DATE=ds[0]; MAX_DATE=ds[ds.length-1];
 
-  const startEl = document.getElementById("dateStart");
-  const endEl = document.getElementById("dateEnd");
+  const startEl=document.getElementById("dateStart");
+  const endEl=document.getElementById("dateEnd");
 
-  startEl.min = toISO(MIN_DATE);
-  startEl.max = toISO(MAX_DATE);
-  endEl.min = toISO(MIN_DATE);
-  endEl.max = toISO(MAX_DATE);
+  startEl.min=toISO(MIN_DATE); startEl.max=toISO(MAX_DATE);
+  endEl.min=toISO(MIN_DATE);   endEl.max=toISO(MAX_DATE);
 
-  if (!startEl.value) startEl.value = toISO(MIN_DATE);
-  if (!endEl.value) endEl.value = toISO(MAX_DATE);
+  if(!startEl.value) startEl.value=toISO(MIN_DATE);
+  if(!endEl.value) endEl.value=toISO(MAX_DATE);
 
   document.getElementById("kpi_range").textContent =
     `${new Date(startEl.value).toLocaleDateString("pt-BR")} → ${new Date(endEl.value).toLocaleDateString("pt-BR")}`;
 }
-function getSelectedDateRange() {
-  const startEl = document.getElementById("dateStart");
-  const endEl = document.getElementById("dateEnd");
-  const s = startEl.value ? new Date(startEl.value + "T00:00:00") : null;
-  const e = endEl.value ? new Date(endEl.value + "T23:59:59") : null;
-  return { s, e };
+function getSelectedDateRange(){
+  const s = document.getElementById("dateStart").value ? new Date(document.getElementById("dateStart").value+"T00:00:00") : null;
+  const e = document.getElementById("dateEnd").value ? new Date(document.getElementById("dateEnd").value+"T23:59:59") : null;
+  return {s,e};
 }
-function filterBySelectedDates(data) {
-  const { s, e } = getSelectedDateRange();
-  if (!s || !e) return data;
-  return data.filter(x => x.data && x.data >= s && x.data <= e);
+function filterBySelectedDates(data){
+  const {s,e}=getSelectedDateRange();
+  if(!s||!e) return data;
+  return data.filter(x=>x.data && x.data>=s && x.data<=e);
 }
-function applyDateFilter() {
-  if (!ALL_DATA.length) {
-    alert("Carregue o CSV primeiro (Atualizar).");
-    return;
-  }
+function applyDateFilter(){
+  if(!ALL_DATA.length){ alert("Carregue o CSV primeiro (Atualizar)."); return; }
   document.getElementById("kpi_range").textContent =
     `${new Date(document.getElementById("dateStart").value).toLocaleDateString("pt-BR")} → ${new Date(document.getElementById("dateEnd").value).toLocaleDateString("pt-BR")}`;
-  const filtered = filterBySelectedDates(ALL_DATA);
-  renderDashboard(filtered);
-}
-
-/* =========================
-   DEBUG helpers (AJ/AK)
-========================= */
-function setDbg(text) {
-  document.getElementById("dbg").textContent = text || "—";
-}
-function appendDbg(text) {
-  document.getElementById("dbg").textContent += (text || "");
+  renderDashboard(filterBySelectedDates(ALL_DATA));
 }
 
 /* =========================
    Load data
 ========================= */
-async function loadData() {
-  const url = document.getElementById("csvUrl").value.trim();
-  if (!url) { alert("Cole a URL CSV publicada (output=csv)."); return; }
+async function loadData(){
+  const url=document.getElementById("csvUrl").value.trim();
+  if(!url){ alert("Cole a URL CSV publicada (output=csv)."); return; }
 
-  document.getElementById("meta").textContent = "Carregando CSV...";
-  ["tbl_price","tbl_kgdev","tbl_prevday","tbl_abc","tbl_nf"].forEach(id => document.getElementById(id).innerHTML = "");
-  ["kpi_rows","kpi_prod","kpi_rtotal","kpi_kilo","kpi_lastdate","kpi_prevdate","kpi_missing","kpi_range"].forEach(id=>{
-    const el = document.getElementById(id);
-    if (el) el.textContent = "—";
+  document.getElementById("meta").textContent="Carregando CSV...";
+  ["tbl_price","tbl_kgdev","tbl_prevday","tbl_abc","tbl_nf"].forEach(id=>document.getElementById(id).innerHTML="");
+  ["kpi_rows","kpi_prod","kpi_rtotal","kpi_kilo","kpi_lastdate","kpi_prevdate","kpi_missing"].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.textContent="—";
   });
-  setDbg("Carregando...");
+  document.getElementById("dbg_cols").textContent="—";
+  document.getElementById("dbg_lastcols").textContent="—";
 
   let raw;
-  try {
-    const r = await fetch(url, { cache: "no-store" });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const text = await r.text();
-    raw = parseCSV(text);
-  } catch (err) {
+  try{
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    raw=parseCSV(await r.text());
+  }catch(err){
     console.error(err);
-    document.getElementById("meta").textContent = "Falha ao carregar CSV. Verifique se a URL termina com output=csv.";
-    setDbg("Falha ao carregar CSV.\nConfirme que a URL termina com:\n...&output=csv");
+    document.getElementById("meta").textContent="Falha ao carregar CSV. Verifique se a URL termina com output=csv.";
     alert("Falha ao carregar CSV.\n\nConfirme que sua URL é do tipo:\n.../pub?gid=XXXX&single=true&output=csv");
     return;
   }
 
-  if (!raw || !raw.length) {
-    document.getElementById("meta").textContent = "CSV vazio.";
-    setDbg("CSV vazio.");
+  if(!raw || !raw.length){
+    document.getElementById("meta").textContent="CSV vazio.";
     return;
   }
 
-  const header = raw[0].map(h => String(h||"").replace(/\u00A0/g," ").trim());
-  const idx = makeIndexMap(header);
+  RAW_HEADER = raw[0].map(h=>String(h||"").replace(/\u00A0/g," ").trim());
+  const idx = makeIndexMap(RAW_HEADER);
 
-  // IMPORTANTÍSSIMO: AJ/AK só existem se o CSV tiver colunas suficientes
-  const COL_AJ = 35; // AJ = 36ª coluna (A=0)
-  const COL_AK = 36; // AK = 37ª coluna (A=0)
+  // DEBUG: colunas
+  document.getElementById("dbg_cols").innerHTML =
+    `Colunas no CSV: <b>${RAW_HEADER.length}</b>`;
+  const tail = RAW_HEADER.slice(Math.max(0, RAW_HEADER.length-12));
+  document.getElementById("dbg_lastcols").innerHTML =
+    `Últimas colunas: <code>${tail.join(" | ")}</code>`;
 
-  // DEBUG do header
-  const totalCols = header.length;
-  const tail = header
-    .map((h,i)=>({i, h}))
-    .slice(Math.max(0, totalCols - 12))
-    .map(x => `${String(x.i).padStart(3,' ')} | ${x.h}`)
-    .join('\n');
+  // Nomes conforme seu print (aceitando variações)
+  const cLote = colAny(idx, ["LOTE"]);
+  const cData = colAny(idx, ["DATA"]);
+  const cProd = colAny(idx, ["PRODUTO"]);
+  const cForn = colAny(idx, ["FORNECEDOR"]);
+  const cNec  = colAny(idx, ["NEC KGS (BRUNO)","KGS (BRL)"]); // use o que existir
+  const cKilo = colAny(idx, ["KILO"]);
+  const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG"]);
+  const cRtot = colAny(idx, ["R$.TOTAL","R$ TOTAL","R$TOTAL","R$. TOTAL"]);
+  const cNF   = colAny(idx, ["NF REC.","NF REC"]);
+  const cQLD  = colAny(idx, ["QLD.","QLD"]);
 
-  setDbg(
-    `Total de colunas no CSV: ${totalCols}\n` +
-    (totalCols < 37
-      ? `\nATENÇÃO: CSV com menos de 37 colunas. AJ/AK não chegaram no export.\nIsso explica "Base R$ = —".\n`
-      : `\nOK: CSV tem colunas suficientes para AJ/AK.\n`
-    ) +
-    `\nÚltimas 12 colunas (índice | nome):\n${tail}\n`
-  );
+  // IMPORTANTÍSSIMO: Base e Dif por NOME (sem depender de AJ/AK)
+  // Pelo seu print, "BASE R$" pode estar em AK e "DIF. R$" logo após.
+  const cBase = colAny(idx, ["BASE R$","BASE R","BASE RS","BASE R$ ","BASE R$  ","BASE"]);
+  const cDif  = colAny(idx, ["DIF. R$","DIF R$","DIF. RS","DIF RS","DIF. R","DIF R"]);
 
-  // nomes conforme seu print (aceitando variações)
-  const cLote  = colAny(idx, ["LOTE"]);
-  const cData  = colAny(idx, ["DATA"]);
-  const cProd  = colAny(idx, ["PRODUTO"]);
-  const cForn  = colAny(idx, ["FORNECEDOR"]);
-  const cNec   = colAny(idx, ["KGS (BRL)", "KGS BRL", "NEC KGS (BRUNO)", "NEC KGS BRUNO"]);
-  const cKilo  = colAny(idx, ["KILO"]);
-  const cRkg   = colAny(idx, ["R$.KG", "R$ KG", "R$/KG", "R$KG"]);
-  const cRtot  = colAny(idx, ["R$.TOTAL", "R$ TOTAL", "R$TOTAL"]);
-  const cNF    = colAny(idx, ["NF REC.", "NF REC"]);
-  const cQLD   = colAny(idx, ["QLD.", "QLD"]);
+  const rows = raw.slice(1).filter(r => r.some(x => String(x||"").trim() !== ""));
 
-  // tenta localizar Base/Dif por nome; se falhar, força AJ/AK por posição (se existirem)
-  const cBaseR_byName = colAny(idx, ["BASE R$", "BASE R$", "BASE RS", "BASE R", "BASE"]);
-  const cDifR_byName  = colAny(idx, ["DIF. R$", "DIF R$", "DIF. RS", "DIF RS", "DIF R$"]);
-
-  const cBaseR = (cBaseR_byName != null) ? cBaseR_byName : (totalCols > COL_AJ ? COL_AJ : null);
-  const cDifR  = (cDifR_byName  != null) ? cDifR_byName  : (totalCols > COL_AK ? COL_AK : null);
-
-  // DEBUG amostra
-  const rowsRaw = raw.slice(1).filter(r => r.some(x => (x||"").trim() !== ""));
-  const firstRow = rowsRaw[0] || [];
-  appendDbg(
-    `\nDetectado:\n` +
-    `- Índice BASE R$: ${cBaseR}\n` +
-    `- Índice DIF. R$:  ${cDifR}\n` +
-    `\nAmostra 1ª linha:\n` +
-    `- BASE R$ (bruto): ${cBaseR!=null ? (firstRow[cBaseR] ?? "") : "(não encontrado)"}\n` +
-    `- DIF. R$  (bruto): ${cDifR!=null  ? (firstRow[cDifR]  ?? "") : "(não encontrado)"}\n`
-  );
-
-  // normaliza linhas
-  const data = rowsRaw.map(r => {
+  const data = rows.map(r=>{
     const d = cData!=null ? toDate(r[cData]) : null;
-    const prod = cProd!=null ? String(r[cProd]||"").trim() : "";
+    const produto = cProd!=null ? String(r[cProd]||"").trim() : "";
+
+    const rkg = cRkg!=null ? toNum(r[cRkg]) : null;
+    const dif = cDif!=null ? toPct(r[cDif]) : null;
+    let base  = cBase!=null ? toNum(r[cBase]) : null;
+
+    // fallback: calcula BASE se veio nulo mas temos R$.KG e DIF
+    // BASE = R$.KG / (1 + DIF)
+    if((base==null || !isFinite(base)) && rkg!=null && isFinite(rkg) && dif!=null && isFinite(dif) && (1+dif) !== 0){
+      base = rkg / (1 + dif);
+    }
+
     return {
-      data: d,
-      dataISO: d ? d.toISOString().slice(0,10) : null,
+      data:d,
+      dataISO: d ? toISO(d) : null,
       lote: cLote!=null ? String(r[cLote]||"").trim() : "",
-      produto: prod,
+      produto,
       fornecedor: cForn!=null ? String(r[cForn]||"").trim() : "",
       nec: cNec!=null ? toNum(r[cNec]) : null,
       kilo: cKilo!=null ? toNum(r[cKilo]) : null,
-      rkg: cRkg!=null ? toNum(r[cRkg]) : null,
+      rkg,
       rtot: cRtot!=null ? toNum(r[cRtot]) : null,
-      base_r: cBaseR!=null ? toNum(r[cBaseR]) : null,     // AJ
-      dif_r_pct: cDifR!=null ? toPct(r[cDifR]) : null,    // AK (fração)
+      base_r: base,
+      dif_r_pct: dif,
       nf: cNF!=null ? String(r[cNF]||"").trim() : "",
       qld: cQLD!=null ? String(r[cQLD]||"").trim() : ""
     };
-  }).filter(x => x.produto && x.data);
+  }).filter(x=>x.produto && x.data);
 
-  ALL_DATA = data;
+  ALL_DATA=data;
   setDateInputsFromData(ALL_DATA);
-
-  const filtered = filterBySelectedDates(ALL_DATA);
-  renderDashboard(filtered);
-
-  document.getElementById("meta").textContent =
-    `OK — ${fmtNum(ALL_DATA.length,0)} linhas carregadas do CSV. Use “Aplicar período” para filtrar.`;
+  renderDashboard(filterBySelectedDates(ALL_DATA));
 }
 
 /* =========================
    Render dashboard
 ========================= */
-function renderDashboard(dataFiltered) {
+function renderDashboard(dataFiltered){
   const datesSel = dataFiltered.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
   const selMin = datesSel.length ? datesSel[0] : null;
   const selMax = datesSel.length ? datesSel[datesSel.length-1] : null;
@@ -509,155 +470,148 @@ function renderDashboard(dataFiltered) {
   document.getElementById("kpi_lastdate").textContent = selMax ? `até ${selMax.toLocaleDateString("pt-BR")}` : "—";
   document.getElementById("kpi_missing").textContent = inWin.length ? `KILO ausente: ${(kiloMissing*100).toFixed(1)}%` : "—";
 
-  /* =========================
-     1) RELATÓRIO AJ/AK — DIF. R$ fora de ±30%
-  ========================= */
+  // 1) ALERTAS DIF. R$ fora ±30% (com Base R$ real ou calculada)
   const priceAlerts = inWin
     .filter(x => x.dif_r_pct != null && isFinite(x.dif_r_pct))
     .filter(x => Math.abs(x.dif_r_pct) >= 0.30)
-    .map(x => {
+    .map(x=>{
       const impacto = (x.kilo!=null && x.rkg!=null && x.base_r!=null)
         ? (x.rkg - x.base_r) * x.kilo
         : null;
-      return { ...x, impacto, abs: Math.abs(x.dif_r_pct) };
+      return {...x, impacto, abs: Math.abs(x.dif_r_pct)};
     })
-    .sort((a,b) => (b.abs - a.abs));
+    .sort((a,b)=>b.abs-a.abs);
 
-  // alerta amigável quando Base R$ não estiver vindo
-  const baseNullPct = priceAlerts.length
-    ? (priceAlerts.filter(x => x.base_r==null).length / priceAlerts.length)
+  // sanity: se base está faltando demais, avisar
+  const baseMissingPct = priceAlerts.length
+    ? (priceAlerts.filter(x=>x.base_r==null || !isFinite(x.base_r)).length / priceAlerts.length)
     : 0;
 
-  const baseWarn = (priceAlerts.length && baseNullPct > 0.3)
-    ? `<div class="small warn" style="margin:0 0 10px 0;">
-         ATENÇÃO: “Base R$” está ausente em ${(baseNullPct*100).toFixed(1)}% das linhas deste relatório.
-         Verifique o card DEBUG: se o CSV tiver menos de 37 colunas, AJ/AK não estão no export.
+  const warnBase = (priceAlerts.length && baseMissingPct > 0.10)
+    ? `<div class="warn small" style="margin:0 0 10px 0;">
+         ATENÇÃO: Base R$ ausente em ${(baseMissingPct*100).toFixed(1)}% das linhas do relatório.
+         Confira o card DEBUG (nomes das colunas no CSV).
        </div>`
     : "";
 
   document.getElementById("tbl_price").innerHTML = priceAlerts.length
-    ? (baseWarn + buildTable(
+    ? (warnBase + buildTable(
         ["Produto","Lote","Data","R$.KG","Base R$","DIF. R$","KILO","Impacto (R$)"],
-        priceAlerts.slice(0,50).map(x => [
+        priceAlerts.map(x=>[
           x.produto,
           x.lote || "",
-          x.dataISO ? new Date(x.dataISO).toLocaleDateString("pt-BR") : "",
+          x.data ? x.data.toLocaleDateString("pt-BR") : "",
           fmtBRL(x.rkg),
           fmtBRL(x.base_r),
           fmtPctHTML(x.dif_r_pct,1),
           fmtNum(x.kilo,2),
           x.impacto==null ? "—" : fmtBRL(x.impacto)
-        ]),
-        50
+        ])
       ))
     : "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
 
-  /* =========================
-     2) Desvio NEC vs KILO
-  ========================= */
-  const kgdev = [];
-  for (const r of inWin) {
-    if (r.nec==null || r.nec===0 || r.kilo==null) continue;
-    const dev = (r.kilo - r.nec)/r.nec;
+  // 2) Desvio NEC vs KILO
+  const kgdev=[];
+  for(const r of inWin){
+    if(r.nec==null || r.nec===0 || r.kilo==null) continue;
+    const dev=(r.kilo-r.nec)/r.nec;
     kgdev.push({...r, dev, abs: Math.abs(dev)});
   }
   kgdev.sort((a,b)=>b.abs-a.abs);
 
-  document.getElementById("tbl_kgdev").innerHTML = kgdev.length ? buildTable(
-    ["Data","Produto","Fornecedor","NEC","KILO","Desvio"],
-    kgdev.slice(0,25).map(x=>[
-      x.dataISO||"",
-      x.produto,
-      x.fornecedor,
-      fmtNum(x.nec,2),
-      fmtNum(x.kilo,2),
-      fmtPctHTML(x.dev,1)
-    ]),
-    25
-  ) : "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
+  document.getElementById("tbl_kgdev").innerHTML = kgdev.length
+    ? buildTable(
+        ["Data","Produto","Fornecedor","NEC","KILO","Desvio"],
+        kgdev.map(x=>[
+          x.data ? x.data.toLocaleDateString("pt-BR") : "",
+          x.produto,
+          x.fornecedor,
+          fmtNum(x.nec,2),
+          fmtNum(x.kilo,2),
+          fmtPctHTML(x.dev,1)
+        ])
+      )
+    : "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
 
-  /* =========================
-     3) Dia anterior (DIF. R$ fora ±30%)
-  ========================= */
+  // 3) Dia anterior — usando DIF. R$ fora ±30%
   const uniqueDates = Array.from(new Set(inWin.map(x=>x.dataISO).filter(Boolean))).sort();
   const yday = uniqueDates.length>1 ? uniqueDates[uniqueDates.length-2] : null;
   document.getElementById("kpi_prevdate").textContent = yday ? `dia ant.: ${new Date(yday).toLocaleDateString("pt-BR")}` : "dia ant.: —";
 
-  let yRows = [];
-  if (yday) {
+  let yRows=[];
+  if(yday){
     yRows = inWin
       .filter(x=>x.dataISO===yday && x.dif_r_pct!=null && isFinite(x.dif_r_pct))
-      .filter(x=>Math.abs(x.dif_r_pct) >= 0.30)
+      .filter(x=>Math.abs(x.dif_r_pct)>=0.30)
       .sort((a,b)=>Math.abs(b.dif_r_pct)-Math.abs(a.dif_r_pct));
   }
 
-  document.getElementById("tbl_prevday").innerHTML = yday ? (
-    yRows.length ? buildTable(
-      ["Dia","Produto","Fornecedor","R$.KG","Base R$","DIF. R$","Lote"],
-      yRows.slice(0,50).map(x=>[
-        new Date(yday).toLocaleDateString("pt-BR"),
-        x.produto,
-        x.fornecedor,
-        fmtBRL(x.rkg),
-        fmtBRL(x.base_r),
-        fmtPctHTML(x.dif_r_pct,1),
-        x.lote || ""
-      ]),
-      50
-    ) : "<div class='muted small'>Nenhum item com DIF. R$ fora de ±30% no “dia anterior” dentro da janela.</div>"
-  ) : "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
+  document.getElementById("tbl_prevday").innerHTML = yday
+    ? (yRows.length
+        ? buildTable(
+            ["Dia","Produto","Fornecedor","R$.KG","Base R$","DIF. R$","Lote"],
+            yRows.map(x=>[
+              new Date(yday).toLocaleDateString("pt-BR"),
+              x.produto,
+              x.fornecedor,
+              fmtBRL(x.rkg),
+              fmtBRL(x.base_r),
+              fmtPctHTML(x.dif_r_pct,1),
+              x.lote||""
+            ])
+          )
+        : "<div class='muted small'>Nenhum item com DIF. R$ fora de ±30% no “dia anterior”.</div>")
+    : "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
 
-  /* =========================
-     4) Curva ABC por KILO
-  ========================= */
-  const kiloByProd = new Map();
-  for (const r of inWin) {
-    if (r.kilo==null) continue;
-    kiloByProd.set(r.produto, (kiloByProd.get(r.produto)||0)+r.kilo);
+  // 4) Curva ABC por KILO
+  const kiloByProd=new Map();
+  for(const r of inWin){
+    if(r.kilo==null) continue;
+    kiloByProd.set(r.produto,(kiloByProd.get(r.produto)||0)+r.kilo);
   }
-  const abc = Array.from(kiloByProd.entries()).map(([produto,kilo])=>({produto,kilo}));
+  const abc=Array.from(kiloByProd.entries()).map(([produto,kilo])=>({produto,kilo}));
   abc.sort((a,b)=>b.kilo-a.kilo);
-
   const totalK = abc.reduce((s,x)=>s+x.kilo,0) || 1;
+
   let acc=0;
   const abcRows = abc.map(x=>{
     acc += x.kilo;
-    const accPct = acc/totalK;
+    const accPct=acc/totalK;
     const cls = accPct<=0.8 ? "A" : (accPct<=0.95 ? "B" : "C");
     return {...x, accPct, cls};
   });
 
-  document.getElementById("tbl_abc").innerHTML = abcRows.length ? buildTable(
-    ["Produto","KILO (60d)","% acum.","Classe"],
-    abcRows.slice(0,25).map(x=>[
-      x.produto,
-      fmtNum(x.kilo,0),
-      fmtPctHTML(x.accPct,1),
-      x.cls
-    ]),
-    25
-  ) : "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
+  document.getElementById("tbl_abc").innerHTML = abcRows.length
+    ? buildTable(
+        ["Produto","KILO (60d)","% acum.","Classe"],
+        abcRows.map(x=>[
+          x.produto,
+          fmtNum(x.kilo,0),
+          fmtPctHTML(x.accPct,1),
+          x.cls
+        ])
+      )
+    : "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
 
-  /* =========================
-     5) Pendências NF REC
-  ========================= */
-  const bad = new Set(["ATUAL","NRC","REC.","REC"]);
-  const pend = inWin.filter(x=>{
-    const q = (x.qld||"").trim().toUpperCase();
+  // 5) Pendências NF REC
+  const bad=new Set(["ATUAL","NRC","REC.","REC"]);
+  const pend=inWin.filter(x=>{
+    const q=(x.qld||"").trim().toUpperCase();
     return (!x.nf) && q && !bad.has(q);
   });
 
-  document.getElementById("tbl_nf").innerHTML = pend.length ? buildTable(
-    ["Data","Produto","Fornecedor","QLD.","NF REC."],
-    pend.slice(0,25).map(x=>[
-      x.dataISO||"",
-      x.produto,
-      x.fornecedor,
-      x.qld||"",
-      x.nf||""
-    ]),
-    25
-  ) : "<div class='muted small'>Sem pendências de NF REC (com QLD válido) na janela de 60 dias.</div>";
+  document.getElementById("tbl_nf").innerHTML = pend.length
+    ? buildTable(
+        ["Data","Produto","Fornecedor","QLD.","NF REC."],
+        pend.map(x=>[
+          x.data ? x.data.toLocaleDateString("pt-BR") : "",
+          x.produto,
+          x.fornecedor,
+          x.qld||"",
+          x.nf||""
+        ])
+      )
+    : "<div class='muted small'>Sem pendências de NF REC (com QLD válido) na janela de 60 dias.</div>";
 
   const rangeTxt = selMin && selMax
     ? `Período: ${selMin.toLocaleDateString("pt-BR")} → ${selMax.toLocaleDateString("pt-BR")}`
@@ -671,5 +625,6 @@ function renderDashboard(dataFiltered) {
 // Se quiser carregar automaticamente ao abrir, descomente:
 // window.addEventListener("load", loadData);
 </script>
+
 </body>
 </html>
