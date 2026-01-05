@@ -216,7 +216,7 @@ function toNum(v) {
   if (!s) return null;
   const clean = s
     .replace(/\s/g,'')
-    .replace('R$','')
+    .replace(/R\$/g,'')
     .replace(/\./g,'')
     .replace(',', '.')
     .replace(/[^\d.-]/g,'');
@@ -360,6 +360,10 @@ async function loadData() {
 
   const header = raw[0].map(h => (h||"").trim());
   const idx = new Map(header.map((h,i)=>[h.toUpperCase(), i]));
+  // fallback por posição (A=0 ... AJ=35, AK=36) caso o cabeçalho não venha igual do Sheets
+  const COL_AJ = 35; // BASE R$
+  const COL_AK = 36; // DIF. R$
+
 
   // nomes conforme seu print
   const cLote  = colAny(idx, ["LOTE"]);
@@ -372,8 +376,12 @@ async function loadData() {
   const cRtot  = colAny(idx, ["R$.TOTAL", "R$ TOTAL"]);
   const cNF    = colAny(idx, ["NF REC.", "NF REC"]);
   const cQLD   = colAny(idx, ["QLD.", "QLD"]);
-  const cBaseR = colAny(idx, ["BASE R$"]);   // AJ
-  const cDifR  = colAny(idx, ["DIF. R$"]);   // AK (percentual)
+  const cBaseR_name = colAny(idx, ["BASE R$", "BASE R$", "BASE", "BASE RS", "BASE R", "BASE R$ ", "BASE  R$"]);
+  const cDifR_name  = colAny(idx, ["DIF. R$", "DIF R$", "DIF. RS", "DIF RS", "DIF. R$ ", "DIF  R$"]);
+
+// se não achar pelo nome, força por posição AJ/AK
+  const cBaseR = (cBaseR_name != null) ? cBaseR_name : (header.length > COL_AJ ? COL_AJ : null);
+  const cDifR  = (cDifR_name  != null) ? cDifR_name  : (header.length > COL_AK ? COL_AK : null);
 
   const rows = raw.slice(1).filter(r => r.some(x => (x||"").trim() !== ""));
   const data = rows.map(r => {
