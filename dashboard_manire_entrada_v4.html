@@ -36,6 +36,8 @@
   th, td { padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { text-align:left; color:var(--muted); font-weight:600; }
   .pos { color:var(--good); } .neg { color:var(--bad); }
+  .warn { color:var(--warn); font-weight:700; }
+  pre { white-space:pre-wrap; margin:0; font-size:12px; color:#cfe0f5; }
 </style>
 </head>
 <body>
@@ -124,7 +126,7 @@
     </div>
 
     <div class="card span-7">
-      <h3 style="margin:0 0 8px 0;">Dia anterior disponível — desvios &ge; 30% (preço/kg)</h3>
+      <h3 style="margin:0 0 8px 0;">Dia anterior disponível — itens com DIF. R$ fora de ±30%</h3>
       <div class="muted small" style="margin-bottom:10px;">
         O dashboard usa a última data do período selecionado e busca a data imediatamente anterior com registros (dentro do período).
       </div>
@@ -146,6 +148,17 @@
       </div>
       <div id="tbl_nf"></div>
     </div>
+
+    <!-- DEBUG CARD (crítico para resolver AJ/AK) -->
+    <div class="card span-12">
+      <h3 style="margin:0 0 8px 0;">DEBUG — Estrutura do CSV</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Aqui você enxerga o que realmente chegou do CSV (contagem de colunas, nomes finais e amostra AJ/AK).
+        Se <b>Total de colunas</b> for menor que 37, o CSV não está exportando até AJ/AK.
+      </div>
+      <pre id="dbg">—</pre>
+    </div>
+
   </div>
 </main>
 
@@ -178,7 +191,7 @@ function parseCSV(text) {
       if (c === '\r' && text[i+1] === '\n') i++;
       row.push(cell);
       cell = "";
-      if (row.some(x => x.trim() !== "")) rows.push(row);
+      if (row.some(x => (x||"").trim() !== "")) rows.push(row);
       row = [];
     } else {
       cell += c;
@@ -215,6 +228,7 @@ function toNum(v) {
   const s = String(v).trim();
   if (!s) return null;
   const clean = s
+    .replace(/\u00A0/g, " ")     // NBSP
     .replace(/\s/g,'')
     .replace(/R\$/g,'')
     .replace(/\./g,'')
@@ -223,8 +237,6 @@ function toNum(v) {
   const n = Number(clean);
   return isFinite(n) ? n : null;
 }
-
-// para percentuais vindos como "12,52%" => 0.1252; ou "-8,42%" => -0.0842
 function toPct(v) {
   if (v == null) return null;
   const s = String(v).trim();
@@ -232,11 +244,9 @@ function toPct(v) {
   const hasPct = s.includes("%");
   let n = toNum(s);
   if (n == null) return null;
-  // se veio com "%", ou se é número "grande" (ex.: 12.52), normaliza para fração
   if (hasPct || Math.abs(n) > 1) n = n / 100;
   return n;
 }
-
 function toDate(v) {
   if (!v) return null;
   const s = String(v).trim();
@@ -264,10 +274,30 @@ function buildTable(headers, rows, max=25) {
   return h;
 }
 
-// Busca coluna por nome (insensível a maiúsculas) com fallback
+/* =========================
+   Header normalization + column search
+========================= */
+function normKey(s) {
+  return String(s || "")
+    .replace(/\u00A0/g, " ")           // NBSP
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ")              // colapsa espaços
+    .replace(/[.]/g, "")               // remove pontos
+    .replace(/\$/g, "$")               // mantém $
+    ;
+}
+function makeIndexMap(header) {
+  const m = new Map();
+  header.forEach((h, i) => {
+    const k = normKey(h);
+    if (!m.has(k)) m.set(k, i); // se repetir, mantém o primeiro
+  });
+  return m;
+}
 function colAny(idxMap, candidates) {
   for (const c of candidates) {
-    const i = idxMap.get(String(c).toUpperCase());
+    const i = idxMap.get(normKey(c));
     if (i != null) return i;
   }
   return null;
@@ -297,7 +327,6 @@ function setDateInputsFromData(data) {
   document.getElementById("kpi_range").textContent =
     `${new Date(startEl.value).toLocaleDateString("pt-BR")} → ${new Date(endEl.value).toLocaleDateString("pt-BR")}`;
 }
-
 function getSelectedDateRange() {
   const startEl = document.getElementById("dateStart");
   const endEl = document.getElementById("dateEnd");
@@ -305,13 +334,11 @@ function getSelectedDateRange() {
   const e = endEl.value ? new Date(endEl.value + "T23:59:59") : null;
   return { s, e };
 }
-
 function filterBySelectedDates(data) {
   const { s, e } = getSelectedDateRange();
   if (!s || !e) return data;
   return data.filter(x => x.data && x.data >= s && x.data <= e);
 }
-
 function applyDateFilter() {
   if (!ALL_DATA.length) {
     alert("Carregue o CSV primeiro (Atualizar).");
@@ -324,6 +351,16 @@ function applyDateFilter() {
 }
 
 /* =========================
+   DEBUG helpers (AJ/AK)
+========================= */
+function setDbg(text) {
+  document.getElementById("dbg").textContent = text || "—";
+}
+function appendDbg(text) {
+  document.getElementById("dbg").textContent += (text || "");
+}
+
+/* =========================
    Load data
 ========================= */
 async function loadData() {
@@ -332,13 +369,11 @@ async function loadData() {
 
   document.getElementById("meta").textContent = "Carregando CSV...";
   ["tbl_price","tbl_kgdev","tbl_prevday","tbl_abc","tbl_nf"].forEach(id => document.getElementById(id).innerHTML = "");
-  document.getElementById("kpi_rows").textContent = "—";
-  document.getElementById("kpi_prod").textContent = "—";
-  document.getElementById("kpi_rtotal").textContent = "—";
-  document.getElementById("kpi_kilo").textContent = "—";
-  document.getElementById("kpi_lastdate").textContent = "—";
-  document.getElementById("kpi_prevdate").textContent = "—";
-  document.getElementById("kpi_missing").textContent = "—";
+  ["kpi_rows","kpi_prod","kpi_rtotal","kpi_kilo","kpi_lastdate","kpi_prevdate","kpi_missing","kpi_range"].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.textContent = "—";
+  });
+  setDbg("Carregando...");
 
   let raw;
   try {
@@ -349,42 +384,74 @@ async function loadData() {
   } catch (err) {
     console.error(err);
     document.getElementById("meta").textContent = "Falha ao carregar CSV. Verifique se a URL termina com output=csv.";
+    setDbg("Falha ao carregar CSV.\nConfirme que a URL termina com:\n...&output=csv");
     alert("Falha ao carregar CSV.\n\nConfirme que sua URL é do tipo:\n.../pub?gid=XXXX&single=true&output=csv");
     return;
   }
 
   if (!raw || !raw.length) {
     document.getElementById("meta").textContent = "CSV vazio.";
+    setDbg("CSV vazio.");
     return;
   }
 
-  const header = raw[0].map(h => (h||"").trim());
-  const idx = new Map(header.map((h,i)=>[h.toUpperCase(), i]));
-  // fallback por posição (A=0 ... AJ=35, AK=36) caso o cabeçalho não venha igual do Sheets
-  const COL_AJ = 35; // BASE R$
-  const COL_AK = 36; // DIF. R$
+  const header = raw[0].map(h => String(h||"").replace(/\u00A0/g," ").trim());
+  const idx = makeIndexMap(header);
 
+  // IMPORTANTÍSSIMO: AJ/AK só existem se o CSV tiver colunas suficientes
+  const COL_AJ = 35; // AJ = 36ª coluna (A=0)
+  const COL_AK = 36; // AK = 37ª coluna (A=0)
 
-  // nomes conforme seu print
+  // DEBUG do header
+  const totalCols = header.length;
+  const tail = header
+    .map((h,i)=>({i, h}))
+    .slice(Math.max(0, totalCols - 12))
+    .map(x => `${String(x.i).padStart(3,' ')} | ${x.h}`)
+    .join('\n');
+
+  setDbg(
+    `Total de colunas no CSV: ${totalCols}\n` +
+    (totalCols < 37
+      ? `\nATENÇÃO: CSV com menos de 37 colunas. AJ/AK não chegaram no export.\nIsso explica "Base R$ = —".\n`
+      : `\nOK: CSV tem colunas suficientes para AJ/AK.\n`
+    ) +
+    `\nÚltimas 12 colunas (índice | nome):\n${tail}\n`
+  );
+
+  // nomes conforme seu print (aceitando variações)
   const cLote  = colAny(idx, ["LOTE"]);
   const cData  = colAny(idx, ["DATA"]);
   const cProd  = colAny(idx, ["PRODUTO"]);
   const cForn  = colAny(idx, ["FORNECEDOR"]);
-  const cNec   = colAny(idx, ["KGS (BRL)", "NEC KGS (BRUNO)"]); // se você tiver os 2, mantém pelo nome encontrado
+  const cNec   = colAny(idx, ["KGS (BRL)", "KGS BRL", "NEC KGS (BRUNO)", "NEC KGS BRUNO"]);
   const cKilo  = colAny(idx, ["KILO"]);
-  const cRkg   = colAny(idx, ["R$.KG", "R$ KG", "R$/KG"]);
-  const cRtot  = colAny(idx, ["R$.TOTAL", "R$ TOTAL"]);
+  const cRkg   = colAny(idx, ["R$.KG", "R$ KG", "R$/KG", "R$KG"]);
+  const cRtot  = colAny(idx, ["R$.TOTAL", "R$ TOTAL", "R$TOTAL"]);
   const cNF    = colAny(idx, ["NF REC.", "NF REC"]);
   const cQLD   = colAny(idx, ["QLD.", "QLD"]);
-  const cBaseR_name = colAny(idx, ["BASE R$", "BASE R$", "BASE", "BASE RS", "BASE R", "BASE R$ ", "BASE  R$"]);
-  const cDifR_name  = colAny(idx, ["DIF. R$", "DIF R$", "DIF. RS", "DIF RS", "DIF. R$ ", "DIF  R$"]);
 
-// se não achar pelo nome, força por posição AJ/AK
-  const cBaseR = (cBaseR_name != null) ? cBaseR_name : (header.length > COL_AJ ? COL_AJ : null);
-  const cDifR  = (cDifR_name  != null) ? cDifR_name  : (header.length > COL_AK ? COL_AK : null);
+  // tenta localizar Base/Dif por nome; se falhar, força AJ/AK por posição (se existirem)
+  const cBaseR_byName = colAny(idx, ["BASE R$", "BASE R$", "BASE RS", "BASE R", "BASE"]);
+  const cDifR_byName  = colAny(idx, ["DIF. R$", "DIF R$", "DIF. RS", "DIF RS", "DIF R$"]);
 
-  const rows = raw.slice(1).filter(r => r.some(x => (x||"").trim() !== ""));
-  const data = rows.map(r => {
+  const cBaseR = (cBaseR_byName != null) ? cBaseR_byName : (totalCols > COL_AJ ? COL_AJ : null);
+  const cDifR  = (cDifR_byName  != null) ? cDifR_byName  : (totalCols > COL_AK ? COL_AK : null);
+
+  // DEBUG amostra
+  const rowsRaw = raw.slice(1).filter(r => r.some(x => (x||"").trim() !== ""));
+  const firstRow = rowsRaw[0] || [];
+  appendDbg(
+    `\nDetectado:\n` +
+    `- Índice BASE R$: ${cBaseR}\n` +
+    `- Índice DIF. R$:  ${cDifR}\n` +
+    `\nAmostra 1ª linha:\n` +
+    `- BASE R$ (bruto): ${cBaseR!=null ? (firstRow[cBaseR] ?? "") : "(não encontrado)"}\n` +
+    `- DIF. R$  (bruto): ${cDifR!=null  ? (firstRow[cDifR]  ?? "") : "(não encontrado)"}\n`
+  );
+
+  // normaliza linhas
+  const data = rowsRaw.map(r => {
     const d = cData!=null ? toDate(r[cData]) : null;
     const prod = cProd!=null ? String(r[cProd]||"").trim() : "";
     return {
@@ -405,11 +472,13 @@ async function loadData() {
   }).filter(x => x.produto && x.data);
 
   ALL_DATA = data;
-
   setDateInputsFromData(ALL_DATA);
 
   const filtered = filterBySelectedDates(ALL_DATA);
   renderDashboard(filtered);
+
+  document.getElementById("meta").textContent =
+    `OK — ${fmtNum(ALL_DATA.length,0)} linhas carregadas do CSV. Use “Aplicar período” para filtrar.`;
 }
 
 /* =========================
@@ -442,7 +511,6 @@ function renderDashboard(dataFiltered) {
 
   /* =========================
      1) RELATÓRIO AJ/AK — DIF. R$ fora de ±30%
-     Campos: PRODUTO, LOTE, DATA, R$.KG, BASE R$, DIF. R$
   ========================= */
   const priceAlerts = inWin
     .filter(x => x.dif_r_pct != null && isFinite(x.dif_r_pct))
@@ -455,8 +523,20 @@ function renderDashboard(dataFiltered) {
     })
     .sort((a,b) => (b.abs - a.abs));
 
+  // alerta amigável quando Base R$ não estiver vindo
+  const baseNullPct = priceAlerts.length
+    ? (priceAlerts.filter(x => x.base_r==null).length / priceAlerts.length)
+    : 0;
+
+  const baseWarn = (priceAlerts.length && baseNullPct > 0.3)
+    ? `<div class="small warn" style="margin:0 0 10px 0;">
+         ATENÇÃO: “Base R$” está ausente em ${(baseNullPct*100).toFixed(1)}% das linhas deste relatório.
+         Verifique o card DEBUG: se o CSV tiver menos de 37 colunas, AJ/AK não estão no export.
+       </div>`
+    : "";
+
   document.getElementById("tbl_price").innerHTML = priceAlerts.length
-    ? buildTable(
+    ? (baseWarn + buildTable(
         ["Produto","Lote","Data","R$.KG","Base R$","DIF. R$","KILO","Impacto (R$)"],
         priceAlerts.slice(0,50).map(x => [
           x.produto,
@@ -469,11 +549,11 @@ function renderDashboard(dataFiltered) {
           x.impacto==null ? "—" : fmtBRL(x.impacto)
         ]),
         50
-      )
+      ))
     : "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
 
   /* =========================
-     2) Desvio NEC vs KILO (mantido)
+     2) Desvio NEC vs KILO
   ========================= */
   const kgdev = [];
   for (const r of inWin) {
@@ -497,8 +577,7 @@ function renderDashboard(dataFiltered) {
   ) : "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
 
   /* =========================
-     3) Dia anterior — agora usando o mesmo critério de DIF. R$
-     (se você quiser manter o antigo por R$/kg, eu ajusto)
+     3) Dia anterior (DIF. R$ fora ±30%)
   ========================= */
   const uniqueDates = Array.from(new Set(inWin.map(x=>x.dataISO).filter(Boolean))).sort();
   const yday = uniqueDates.length>1 ? uniqueDates[uniqueDates.length-2] : null;
@@ -529,7 +608,7 @@ function renderDashboard(dataFiltered) {
   ) : "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
 
   /* =========================
-     4) Curva ABC por KILO (mantido)
+     4) Curva ABC por KILO
   ========================= */
   const kiloByProd = new Map();
   for (const r of inWin) {
@@ -560,7 +639,7 @@ function renderDashboard(dataFiltered) {
   ) : "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
 
   /* =========================
-     5) Pendências NF REC (mantido)
+     5) Pendências NF REC
   ========================= */
   const bad = new Set(["ATUAL","NRC","REC.","REC"]);
   const pend = inWin.filter(x=>{
@@ -589,8 +668,8 @@ function renderDashboard(dataFiltered) {
     `Janela 60d: ${winStart.toLocaleDateString("pt-BR")} → ${maxDate.toLocaleDateString("pt-BR")}.`;
 }
 
-// se quiser carregar automaticamente ao abrir, descomente:
-// loadData();
+// Se quiser carregar automaticamente ao abrir, descomente:
+// window.addEventListener("load", loadData);
 </script>
 </body>
 </html>
