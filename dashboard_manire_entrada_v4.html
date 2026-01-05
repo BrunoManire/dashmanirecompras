@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Manirê | Dashboard Entradas In Natura</title>
+
 <style>
   :root{
     --bg:#0b0f14; --card:#111826; --text:#e7eef7; --muted:#9db0c5; --line:#223044;
@@ -55,120 +56,88 @@
   .sort-ind{margin-left:6px;color:var(--muted);font-size:11px;}
 
   /* =========================
-     MENU (HAMBURGUER + DRAWER)
+     MENU (UM ÚNICO DRAWER)
      ========================= */
   .hambtn{
-    width:40px;height:40px;border-radius:12px;
-    display:grid;place-items:center;
-    border:1px solid var(--line);
-    background:#182234;color:var(--text);
-    cursor:pointer;
-  }
-  .hambtn:hover{filter:brightness(1.08);}
-
-  .drawerOverlay{
-    position:fixed; inset:0;
-    background:rgba(0,0,0,.55);
-    display:none;
-    z-index:50;
-  }
-  .drawer{
-    position:fixed; top:0; left:0;
-    width:min(340px, 88vw);
-    height:100vh;
-    background:var(--card);
-    border-right:1px solid var(--line);
-    transform:translateX(-105%);
-    transition:transform .18s ease;
-    z-index:60;
-    display:flex;
-    flex-direction:column;
-  }
-  .drawer.open{transform:translateX(0);}
-
-  .drawerHeader{
-    padding:16px 16px 10px;
-    border-bottom:1px solid var(--line);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-  }
-  .drawerTitle{font-weight:700;}
-
-  .drawerClose{
-    width:36px;height:36px;border-radius:12px;
+    width:42px;height:42px;border-radius:12px;
+    display:inline-flex;align-items:center;justify-content:center;
     border:1px solid var(--line);
     background:#0f1520;color:var(--text);
     cursor:pointer;
   }
-  .drawerClose:hover{filter:brightness(1.08);}
+  .hambtn:hover{filter:brightness(1.08);}
 
-  .drawerBody{
-    padding:12px 10px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
+  .drawerMask{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.45);
+    display:none;
+    z-index:50;
   }
-  .navLink{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    padding:10px 12px;
-    border-radius:12px;
-    border:1px solid var(--line);
+  .drawerMask.open{display:block;}
+
+  .drawer{
+    position:fixed; top:0; left:0;
+    height:100%;
+    width:min(320px,88vw);
     background:#0f1520;
+    border-right:1px solid var(--line);
+    transform:translateX(-102%);
+    transition:transform .18s ease;
+    z-index:60;
+    padding:14px;
+  }
+  .drawer.open{transform:translateX(0);}
+
+  .drawer h2{margin:6px 0 10px 0;font-size:14px;}
+  .navlink{
+    display:block;
+    padding:10px 10px;
+    border-radius:10px;
+    border:1px solid transparent;
     color:var(--text);
     text-decoration:none;
   }
-  .navLink:hover{filter:brightness(1.08);}
-  .navLink .sub{color:var(--muted); font-size:11px;}
-  .navLink.active{
-    outline:2px solid rgba(245,194,17,.25);
+  .navlink:hover{border-color:var(--line);background:#111826;}
+  .navlink.active{
     border-color:rgba(245,194,17,.55);
+    background:rgba(245,194,17,.08);
   }
-  /* MENU (hambúrguer) */
-.hambtn{
-  width:42px;height:42px;border-radius:12px;
-  display:inline-flex;align-items:center;justify-content:center;
-  border:1px solid var(--line);background:#0f1520;color:var(--text);cursor:pointer;
-}
-.hambtn:hover{filter:brightness(1.08);}
-.drawerMask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:50;}
-.drawer{position:fixed;top:0;left:0;height:100%;width:min(320px,88vw);
-  background:#0f1520;border-right:1px solid var(--line);
-  transform:translateX(-102%);transition:transform .18s ease;z-index:60;padding:14px;
-}
-.drawer.open{transform:translateX(0);}
-.drawerMask.open{display:block;}
-.drawer h2{margin:6px 0 10px 0;font-size:14px;}
-.navlink{display:block;padding:10px 10px;border-radius:10px;border:1px solid transparent;color:var(--text);text-decoration:none;}
-.navlink:hover{border-color:var(--line);background:#111826;}
-.pill{display:inline-block;margin-top:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px;}
-
+  .pill{
+    display:inline-block;
+    margin-top:10px;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    color:var(--muted);
+    font-size:12px;
+  }
 </style>
 </head>
+
 <body>
+
+<!-- MASK + DRAWER (UM SÓ) -->
 <div id="drawerMask" class="drawerMask" onclick="closeDrawer()"></div>
+
 <aside id="drawer" class="drawer" aria-hidden="true">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
     <h2>Navegação</h2>
     <button class="hambtn" type="button" onclick="closeDrawer()" title="Fechar">✕</button>
   </div>
 
-  <div class="muted small">O período e o CSV são compartilhados entre páginas.</div>
+  <div class="muted small" style="margin-bottom:8px;">
+    O período e o CSV são compartilhados entre páginas.
+  </div>
 
-  <a class="navlink" href="./dashboard_manire_entrada_v4.html"><b>Dashboard — Entradas In Natura</b></a>
+  <!-- Troque o active conforme a página -->
+  <a class="navlink active" href="./dashboard_manire_entrada_v4.html"><b>Dashboard — Entradas In Natura</b></a>
   <a class="navlink" href="./dashboard_reuniao_semanal_v1.html">Reunião Semanal</a>
 
   <div class="pill" id="pillPeriod">Período: —</div>
 </aside>
 
 <header>
-  <button class="hambtn" type="button" onclick="openDrawer()" title="Menu">☰</button>
-
-  <!-- Botão do menu (☰) -->
-  <button class="hambtn" type="button" onclick="openDrawer()" aria-label="Abrir menu">☰</button>
+  <button class="hambtn" type="button" onclick="openDrawer()" aria-label="Abrir menu" title="Menu">☰</button>
 
   <div style="flex:1 1 auto;">
     <h1>Dashboard — Entradas In Natura (Manirê)</h1>
@@ -193,30 +162,6 @@
     <button type="button" onclick="loadData()">Atualizar</button>
   </div>
 </header>
-
-  <!-- OVERLAY + DRAWER (MENU LATERAL) -->
-<div id="drawerOverlay" class="drawerOverlay" onclick="closeDrawer()"></div>
-
-<aside id="drawer" class="drawer" aria-label="Menu de navegação">
-  <div class="drawerHeader">
-    <div class="drawerTitle">Manirê • Navegação</div>
-    <button class="drawerClose" type="button" onclick="closeDrawer()" aria-label="Fechar">✕</button>
-  </div>
-
-  <nav class="drawerBody">
-    <a class="navLink active" href="dashboard_manire_entrada_v4.html">
-      <div>Dashboard • Entradas In Natura</div>
-      <div class="sub">Preço, KILO, ABC, pendências</div>
-    </a>
-
-    <a class="navLink" href="dashboard_reuniao_semanal.html">
-      <div>Reunião Semanal</div>
-      <div class="sub">Nova aba de relatórios (mesmo período)</div>
-    </a>
-  </nav>
-</aside>
-
-
 
 <main>
   <div class="grid">
@@ -320,40 +265,74 @@
 
 <script>
 /* =========================
-   Estado
+   MENU (UM ÚNICO)
 ========================= */
-
 function openDrawer(){
-  document.getElementById("drawerOverlay").style.display = "block";
   document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawerMask").classList.add("open");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
 }
 function closeDrawer(){
-  document.getElementById("drawerOverlay").style.display = "none";
   document.getElementById("drawer").classList.remove("open");
+  document.getElementById("drawerMask").classList.remove("open");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
 }
+window.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeDrawer(); });
 
-// opcional: fechar com ESC
-window.addEventListener("keydown", (e)=>{
-  if(e.key === "Escape") closeDrawer();
-});
-
-
+/* =========================
+   Estado + persistência
+========================= */
 let ALL_DATA = [];
 let MIN_DATE = null;
 let MAX_DATE = null;
 let RAW_HEADER = [];
 
-/* Estado de ordenação por tabela */
+const LS_CSV  = "manire_csvUrl";
+const LS_S0   = "manire_dateStart";
+const LS_S1   = "manire_dateEnd";
+
+function updateDrawerPill(){
+  const s0 = document.getElementById("dateStart").value;
+  const s1 = document.getElementById("dateEnd").value;
+  const pill = document.getElementById("pillPeriod");
+  if(!pill) return;
+  if(s0 && s1){
+    pill.textContent = `Período: ${new Date(s0).toLocaleDateString("pt-BR")} → ${new Date(s1).toLocaleDateString("pt-BR")}`;
+  } else {
+    pill.textContent = "Período: —";
+  }
+}
+function saveSharedState(){
+  localStorage.setItem(LS_CSV, document.getElementById("csvUrl").value.trim());
+  localStorage.setItem(LS_S0, document.getElementById("dateStart").value || "");
+  localStorage.setItem(LS_S1, document.getElementById("dateEnd").value || "");
+  updateDrawerPill();
+}
+function loadSharedStateDefaults(){
+  const defCsv = localStorage.getItem(LS_CSV) || "";
+  const defS0  = localStorage.getItem(LS_S0) || "";
+  const defS1  = localStorage.getItem(LS_S1) || "";
+
+  if(defCsv) document.getElementById("csvUrl").value = defCsv;
+  if(defS0) document.getElementById("dateStart").value = defS0;
+  if(defS1) document.getElementById("dateEnd").value = defS1;
+
+  updateDrawerPill();
+}
+
+/* =========================
+   Estado de ordenação
+========================= */
 const SORT_STATE = {
-  price:   { key: "abs", dir: "desc" },  // default: maior desvio primeiro
+  price:   { key: "abs", dir: "desc" },
   kgdev:   { key: "abs", dir: "desc" },
   prevday: { key: "abs", dir: "desc" },
-  abc:     { key: "kilo", dir: "desc" },
+  abc:     { key: "kilo_num", dir: "desc" },
   nf:      { key: "dataTS", dir: "desc" }
 };
 
 /* =========================
-   CSV parser (simples)
+   CSV parser
 ========================= */
 function parseCSV(text){
   const rows=[];
@@ -381,7 +360,7 @@ function parseCSV(text){
 }
 
 /* =========================
-   Normalização de cabeçalho
+   Normalização cabeçalho
 ========================= */
 function normHeader(s){
   return String(s||"")
@@ -465,16 +444,13 @@ function toISO(d){ return d.toISOString().slice(0,10); }
    Ordenação + tabela clicável
 ========================= */
 function safeStr(v){ return (v==null) ? "" : String(v); }
-
 function compare(a, b, dir){
   const mult = (dir === "asc") ? 1 : -1;
 
-  // nulls sempre por último
   if(a == null && b == null) return 0;
   if(a == null) return 1;
   if(b == null) return -1;
 
-  // number
   if(typeof a === "number" && typeof b === "number"){
     if(!isFinite(a) && !isFinite(b)) return 0;
     if(!isFinite(a)) return 1;
@@ -482,42 +458,22 @@ function compare(a, b, dir){
     return (a - b) * mult;
   }
 
-  // date timestamp
-  if(typeof a === "bigint" || typeof b === "bigint"){
-    const aa = BigInt(a), bb = BigInt(b);
-    return (aa > bb ? 1 : aa < bb ? -1 : 0) * mult;
-  }
-
-  // string fallback
   const sa = safeStr(a).toUpperCase();
   const sb = safeStr(b).toUpperCase();
   if(sa === sb) return 0;
   return (sa > sb ? 1 : -1) * mult;
 }
-
-/**
- * Renderiza tabela com cabeçalhos clicáveis.
- * - tableId: chave do SORT_STATE ("price","kgdev","prevday","abc","nf")
- * - mountId: elemento container (div.tablewrap)
- * - cols: [{label, key, type}]  type: "text"|"num"|"pct"|"brl"|"date"
- * - rows: array de objetos já preparados (com campos numéricos para ordenar)
- * - rowToCells: (r)=> array de strings HTML para <td>
- */
 function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
   const state = SORT_STATE[tableId] || { key: cols[0]?.key, dir: "asc" };
   SORT_STATE[tableId] = state;
 
-  // ordena
   const sorted = [...rows].sort((r1, r2) => compare(r1[state.key], r2[state.key], state.dir));
 
-  // header
   let html = `<table><thead><tr>`;
   for(const c of cols){
     const active = (c.key === state.key);
     const ind = active ? (state.dir === "asc" ? "▲" : "▼") : "";
-    html += `<th class="sortable" data-t="${tableId}" data-k="${c.key}">
-               ${c.label}<span class="sort-ind">${ind}</span>
-             </th>`;
+    html += `<th class="sortable" data-t="${tableId}" data-k="${c.key}">${c.label}<span class="sort-ind">${ind}</span></th>`;
   }
   html += `</tr></thead><tbody>`;
 
@@ -530,22 +486,16 @@ function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
   const mount = document.getElementById(mountId);
   mount.innerHTML = html;
 
-  // bind clicks
   mount.querySelectorAll("th.sortable").forEach(th=>{
     th.addEventListener("click", ()=>{
       const t = th.getAttribute("data-t");
       const k = th.getAttribute("data-k");
       const st = SORT_STATE[t] || { key:k, dir:"asc" };
 
-      if(st.key === k){
-        st.dir = (st.dir === "asc") ? "desc" : "asc";
-      } else {
-        st.key = k;
-        st.dir = "asc"; // ao trocar coluna, começa asc
-      }
-      SORT_STATE[t] = st;
+      if(st.key === k) st.dir = (st.dir === "asc") ? "desc" : "asc";
+      else { st.key = k; st.dir = "asc"; }
 
-      // re-render do dashboard inteiro (mantém consistência)
+      SORT_STATE[t] = st;
       renderDashboard(filterBySelectedDates(ALL_DATA));
     });
   });
@@ -571,6 +521,8 @@ function setDateInputsFromData(data){
 
   document.getElementById("kpi_range").textContent =
     `${new Date(startEl.value).toLocaleDateString("pt-BR")} → ${new Date(endEl.value).toLocaleDateString("pt-BR")}`;
+
+  updateDrawerPill();
 }
 function getSelectedDateRange(){
   const s = document.getElementById("dateStart").value ? new Date(document.getElementById("dateStart").value+"T00:00:00") : null;
@@ -590,51 +542,6 @@ function applyDateFilter(){
     `${new Date(document.getElementById("dateStart").value).toLocaleDateString("pt-BR")} → ${new Date(document.getElementById("dateEnd").value).toLocaleDateString("pt-BR")}`;
   renderDashboard(filterBySelectedDates(ALL_DATA));
 }
-const LS_CSV  = "manire_csvUrl";
-const LS_S0   = "manire_dateStart";
-const LS_S1   = "manire_dateEnd";
-
-function openDrawer(){
-  document.getElementById("drawer").classList.add("open");
-  document.getElementById("drawerMask").classList.add("open");
-  document.getElementById("drawer").setAttribute("aria-hidden","false");
-}
-function closeDrawer(){
-  document.getElementById("drawer").classList.remove("open");
-  document.getElementById("drawerMask").classList.remove("open");
-  document.getElementById("drawer").setAttribute("aria-hidden","true");
-}
-
-function updateDrawerPill(){
-  const s0 = document.getElementById("dateStart").value;
-  const s1 = document.getElementById("dateEnd").value;
-  const pill = document.getElementById("pillPeriod");
-  if(!pill) return;
-  if(s0 && s1){
-    pill.textContent = `Período: ${new Date(s0).toLocaleDateString("pt-BR")} → ${new Date(s1).toLocaleDateString("pt-BR")}`;
-  } else {
-    pill.textContent = "Período: —";
-  }
-}
-
-function saveSharedState(){
-  localStorage.setItem(LS_CSV, document.getElementById("csvUrl").value.trim());
-  localStorage.setItem(LS_S0, document.getElementById("dateStart").value || "");
-  localStorage.setItem(LS_S1, document.getElementById("dateEnd").value || "");
-  updateDrawerPill();
-}
-
-function loadSharedStateDefaults(){
-  const defCsv = localStorage.getItem(LS_CSV) || "";
-  const defS0  = localStorage.getItem(LS_S0) || "";
-  const defS1  = localStorage.getItem(LS_S1) || "";
-
-  if(defCsv) document.getElementById("csvUrl").value = defCsv;
-  if(defS0) document.getElementById("dateStart").value = defS0;
-  if(defS1) document.getElementById("dateEnd").value = defS1;
-
-  updateDrawerPill();
-}
 
 /* =========================
    Load data
@@ -651,7 +558,6 @@ async function loadData(){
   document.getElementById("dbg_cols").textContent="—";
   document.getElementById("dbg_lastcols").textContent="—";
   saveSharedState();
-
 
   let raw;
   try{
@@ -673,14 +579,10 @@ async function loadData(){
   RAW_HEADER = raw[0].map(h=>String(h||"").replace(/\u00A0/g," ").trim());
   const idx = makeIndexMap(RAW_HEADER);
 
-  // DEBUG: colunas
-  document.getElementById("dbg_cols").innerHTML =
-    `Colunas no CSV: <b>${RAW_HEADER.length}</b>`;
+  document.getElementById("dbg_cols").innerHTML = `Colunas no CSV: <b>${RAW_HEADER.length}</b>`;
   const tail = RAW_HEADER.slice(Math.max(0, RAW_HEADER.length-12));
-  document.getElementById("dbg_lastcols").innerHTML =
-    `Últimas colunas: <code>${tail.join(" | ")}</code>`;
+  document.getElementById("dbg_lastcols").innerHTML = `Últimas colunas: <code>${tail.join(" | ")}</code>`;
 
-  // Nomes conforme seu print (aceitando variações)
   const cLote = colAny(idx, ["LOTE"]);
   const cData = colAny(idx, ["DATA"]);
   const cProd = colAny(idx, ["PRODUTO"]);
@@ -692,7 +594,6 @@ async function loadData(){
   const cNF   = colAny(idx, ["NF REC.","NF REC"]);
   const cQLD  = colAny(idx, ["QLD.","QLD"]);
 
-  // Base e Dif por NOME
   const cBase = colAny(idx, ["BASE R$","BASE R","BASE RS","BASE R$ ","BASE R$  ","BASE"]);
   const cDif  = colAny(idx, ["DIF. R$","DIF R$","DIF. RS","DIF RS","DIF. R","DIF R"]);
 
@@ -706,7 +607,6 @@ async function loadData(){
     const dif = cDif!=null ? toPct(r[cDif]) : null;
     let base  = cBase!=null ? toNum(r[cBase]) : null;
 
-    // fallback: calcula BASE se veio nulo mas temos R$.KG e DIF
     if((base==null || !isFinite(base)) && rkg!=null && isFinite(rkg) && dif!=null && isFinite(dif) && (1+dif) !== 0){
       base = rkg / (1 + dif);
     }
@@ -742,17 +642,14 @@ function renderDashboard(dataFiltered){
   const selMin = datesSel.length ? datesSel[0] : null;
   const selMax = datesSel.length ? datesSel[datesSel.length-1] : null;
 
-  // janela 60d baseada na última data do período selecionado
   const maxDate = selMax || new Date();
   const winStart = new Date(maxDate.getTime() - 60*24*3600*1000);
   const inWin = dataFiltered.filter(x => x.data && x.data >= winStart && x.data <= maxDate);
 
-  // KPIs
   const linhas = dataFiltered.length;
   const produtos = new Set(dataFiltered.map(x=>x.produto)).size;
   const rTotal60 = inWin.map(x=>x.rtot).filter(x=>x!=null).reduce((s,v)=>s+v,0);
   const kilos60 = inWin.map(x=>x.kilo).filter(x=>x!=null).reduce((s,v)=>s+v,0);
-
   const kiloMissing = inWin.length ? (inWin.filter(x=>x.kilo==null).length / inWin.length) : 0;
 
   document.getElementById("kpi_rows").textContent = fmtNum(linhas,0);
@@ -762,9 +659,7 @@ function renderDashboard(dataFiltered){
   document.getElementById("kpi_lastdate").textContent = selMax ? `até ${selMax.toLocaleDateString("pt-BR")}` : "—";
   document.getElementById("kpi_missing").textContent = inWin.length ? `KILO ausente: ${(kiloMissing*100).toFixed(1)}%` : "—";
 
-  /* =========================
-     1) ALERTAS DIF. R$ fora ±30%
-  ========================= */
+  /* 1) ALERTAS DIF. R$ fora ±30% */
   const priceAlerts = inWin
     .filter(x => x.dif_r_pct != null && isFinite(x.dif_r_pct))
     .filter(x => Math.abs(x.dif_r_pct) >= 0.30)
@@ -798,24 +693,19 @@ function renderDashboard(dataFiltered){
 
   if(priceAlerts.length){
     const cols = [
-      { label:"Produto",        key:"produto" },
-      { label:"Lote",           key:"lote" },
-      { label:"Data",           key:"dataTS" },
-      { label:"R$.KG",          key:"rkg_num" },
-      { label:"Base R$",        key:"base_num" },
-      { label:"DIF. R$",        key:"dif_num" },
-      { label:"KILO",           key:"kilo_num" },
-      { label:"Impacto (R$)",   key:"impacto_num" }
+      { label:"Produto",      key:"produto" },
+      { label:"Lote",         key:"lote" },
+      { label:"Data",         key:"dataTS" },
+      { label:"R$.KG",        key:"rkg_num" },
+      { label:"Base R$",      key:"base_num" },
+      { label:"DIF. R$",      key:"dif_num" },
+      { label:"KILO",         key:"kilo_num" },
+      { label:"Impacto (R$)", key:"impacto_num" }
     ];
 
-    // injeta aviso e tabela
     document.getElementById("tbl_price").innerHTML = warnBase + `<div id="tbl_price_inner"></div>`;
-
     renderSortableTable(
-      "price",
-      "tbl_price_inner",
-      cols,
-      priceAlerts,
+      "price","tbl_price_inner",cols,priceAlerts,
       (x)=>[
         x.produto,
         x.lote || "",
@@ -832,9 +722,7 @@ function renderDashboard(dataFiltered){
       "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
   }
 
-  /* =========================
-     2) Desvio NEC vs KILO
-  ========================= */
+  /* 2) Desvio NEC vs KILO */
   const kgdev=[];
   for(const r of inWin){
     if(r.nec==null || r.nec===0 || r.kilo==null) continue;
@@ -844,7 +732,6 @@ function renderDashboard(dataFiltered){
       dev,
       abs: Math.abs(dev),
       dev_num: dev,
-      abs_num: Math.abs(dev),
       nec_num: r.nec,
       kilo_num: r.kilo,
       dataTS: r.data ? r.data.getTime() : null
@@ -862,10 +749,7 @@ function renderDashboard(dataFiltered){
     ];
 
     renderSortableTable(
-      "kgdev",
-      "tbl_kgdev",
-      cols,
-      kgdev,
+      "kgdev","tbl_kgdev",cols,kgdev,
       (x)=>[
         x.data ? x.data.toLocaleDateString("pt-BR") : "",
         x.produto,
@@ -880,9 +764,7 @@ function renderDashboard(dataFiltered){
       "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
   }
 
-  /* =========================
-     3) Dia anterior — DIF. R$ fora ±30%
-  ========================= */
+  /* 3) Dia anterior */
   const uniqueDates = Array.from(new Set(inWin.map(x=>x.dataISO).filter(Boolean))).sort();
   const yday = uniqueDates.length>1 ? uniqueDates[uniqueDates.length-2] : null;
   document.getElementById("kpi_prevdate").textContent = yday ? `dia ant.: ${new Date(yday).toLocaleDateString("pt-BR")}` : "dia ant.: —";
@@ -892,21 +774,13 @@ function renderDashboard(dataFiltered){
     yRows = inWin
       .filter(x=>x.dataISO===yday && x.dif_r_pct!=null && isFinite(x.dif_r_pct))
       .filter(x=>Math.abs(x.dif_r_pct)>=0.30)
-      .map(x=>{
-        const impacto = (x.kilo!=null && x.rkg!=null && x.base_r!=null)
-          ? (x.rkg - x.base_r) * x.kilo
-          : null;
-        return {
-          ...x,
-          abs: Math.abs(x.dif_r_pct),
-          dataTS: x.data ? x.data.getTime() : null,
-          rkg_num: x.rkg,
-          base_num: x.base_r,
-          dif_num: x.dif_r_pct,
-          impacto_num: impacto,
-          kilo_num: x.kilo
-        };
-      });
+      .map(x=>({
+        ...x,
+        dataTS: x.data ? x.data.getTime() : null,
+        rkg_num: x.rkg,
+        base_num: x.base_r,
+        dif_num: x.dif_r_pct
+      }));
   }
 
   if(yday){
@@ -920,12 +794,8 @@ function renderDashboard(dataFiltered){
         { label:"DIF. R$",    key:"dif_num" },
         { label:"Lote",       key:"lote" }
       ];
-
       renderSortableTable(
-        "prevday",
-        "tbl_prevday",
-        cols,
-        yRows,
+        "prevday","tbl_prevday",cols,yRows,
         (x)=>[
           x.data ? x.data.toLocaleDateString("pt-BR") : "",
           x.produto,
@@ -945,9 +815,7 @@ function renderDashboard(dataFiltered){
       "<div class='muted small'>Sem histórico suficiente para identificar “dia anterior”.</div>";
   }
 
-  /* =========================
-     4) Curva ABC por KILO
-  ========================= */
+  /* 4) Curva ABC por KILO */
   const kiloByProd=new Map();
   for(const r of inWin){
     if(r.kilo==null) continue;
@@ -962,27 +830,18 @@ function renderDashboard(dataFiltered){
     acc += x.kilo;
     const accPct=acc/totalK;
     const cls = accPct<=0.8 ? "A" : (accPct<=0.95 ? "B" : "C");
-    return {
-      ...x,
-      accPct,
-      cls,
-      acc_num: accPct
-    };
+    return {...x, accPct, cls, acc_num: accPct};
   });
 
   if(abcRows.length){
     const cols = [
-      { label:"Produto",  key:"produto" },
+      { label:"Produto",    key:"produto" },
       { label:"KILO (60d)", key:"kilo_num" },
-      { label:"% acum.",  key:"acc_num" },
-      { label:"Classe",   key:"cls" }
+      { label:"% acum.",    key:"acc_num" },
+      { label:"Classe",     key:"cls" }
     ];
-
     renderSortableTable(
-      "abc",
-      "tbl_abc",
-      cols,
-      abcRows,
+      "abc","tbl_abc",cols,abcRows,
       (x)=>[
         x.produto,
         fmtNum(x.kilo,0),
@@ -995,17 +854,12 @@ function renderDashboard(dataFiltered){
       "<div class='muted small'>Sem KILO suficiente na janela de 60 dias.</div>";
   }
 
-  /* =========================
-     5) Pendências NF REC
-  ========================= */
+  /* 5) Pendências NF REC */
   const bad=new Set(["ATUAL","NRC","REC.","REC"]);
   const pend=inWin.filter(x=>{
     const q=(x.qld||"").trim().toUpperCase();
     return (!x.nf) && q && !bad.has(q);
-  }).map(x=>({
-    ...x,
-    dataTS: x.data ? x.data.getTime() : null
-  }));
+  }).map(x=>({...x, dataTS: x.data ? x.data.getTime() : null}));
 
   if(pend.length){
     const cols = [
@@ -1015,12 +869,8 @@ function renderDashboard(dataFiltered){
       { label:"QLD.",      key:"qld" },
       { label:"NF REC.",   key:"nf" }
     ];
-
     renderSortableTable(
-      "nf",
-      "tbl_nf",
-      cols,
-      pend,
+      "nf","tbl_nf",cols,pend,
       (x)=>[
         x.data ? x.data.toLocaleDateString("pt-BR") : "",
         x.produto,
@@ -1042,11 +892,10 @@ function renderDashboard(dataFiltered){
     `OK — ${fmtNum(linhas,0)} linhas (período selecionado). ${rangeTxt}. ` +
     `Janela 60d: ${winStart.toLocaleDateString("pt-BR")} → ${maxDate.toLocaleDateString("pt-BR")}.`;
 }
-  loadSharedStateDefaults();
 
-
-// Se quiser carregar automaticamente ao abrir, descomente:
-// window.addEventListener("load", loadData);
+/* init */
+loadSharedStateDefaults();
+updateDrawerPill();
 </script>
 
 </body>
