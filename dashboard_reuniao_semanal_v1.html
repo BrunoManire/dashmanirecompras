@@ -90,6 +90,44 @@
     display:inline-block;margin-top:8px;padding:6px 10px;border-radius:999px;
     border:1px solid var(--line);color:var(--muted);font-size:12px;
   }
+  /* =========================
+     PIVOT: sticky 2 primeiras colunas + quebra visual
+     ========================= */
+  .pivotTable{ min-width:1200px; } /* garante espaço p/ scroll lateral */
+
+  /* sticky para PRODUTO e TOTAL */
+  th.stickyL, td.stickyL{
+    position:sticky;
+    left:0;
+    z-index:3;
+    background:#0f1520;
+  }
+  th.stickyL2, td.stickyL2{
+    position:sticky;
+    left:220px;               /* largura da coluna PRODUTO (ajuste abaixo) */
+    z-index:3;
+    background:#0f1520;
+  }
+
+  /* largura fixa para manter o "comparativo" estável */
+  th.col-prod, td.col-prod{ min-width:220px; max-width:220px; }
+  th.col-tot,  td.col-tot { min-width:140px; max-width:140px; text-align:right; }
+
+  /* quebra forte após Total geral */
+  th.breakAfter, td.breakAfter{
+    border-right:4px solid #2b3a52 !important;
+    background:rgba(157,176,197,.06);
+  }
+
+  /* cores condicionais vs Total geral */
+  .cell-hi{ color:var(--bad); font-weight:700; }  /* > total */
+  .cell-lo{ color:var(--good); font-weight:700; } /* < total */
+  .cell-eq{ color:var(--muted); font-weight:600; } /* = total */
+
+  /* mantém cabeçalho sticky sem "vazar" por cima das colunas sticky */
+  th{ z-index:1; }
+  th.stickyL, th.stickyL2{ z-index:4; }
+
 </style>
 </head>
 <body>
@@ -225,6 +263,155 @@
 </main>
 
 <script>
+  /* =========================================================
+   PIVOT: ajustes solicitados
+   - ordem de colunas: PRODUTO | Total geral | datas (mais recente -> mais antiga)
+   - sticky: PRODUTO e Total geral
+   - cor: compara cada dia com Total geral
+========================================================= */
+
+/* SUBSTITUA a parte do render do PIVOT dentro de renderPage(dataFiltered)
+   por este bloco (somente o trecho do "===== 2) Pivot por dia (top20) =====")
+*/
+
+if(selMin && selMax && top20.length){
+  // buildPivotTop20 já existe no seu código
+  let { days, rows } = buildPivotTop20(dataFiltered, top20, selMin, selMax);
+
+  // 1) datas em ordem decrescente (mais atuais -> mais antigas)
+  const daysDesc = [...days].reverse();
+
+  // 2) colunas: PRODUTO | Total geral | datas (desc)
+  const colsPivot = [
+    {key:"produto", type:"str", label:"PRODUTO"},
+    {key:"TOTAL_GERAL", type:"num", label:"Total geral"},
+    ...daysDesc.map(d=>({key:d, type:"num", label:new Date(d).toLocaleDateString("pt-BR")}))
+  ];
+
+  // 3) ordenação default: Total geral desc
+  SORT_STATE["coefPivot"] = {key:"TOTAL_GERAL", dir:-1};
+  sortRows(rows, {...colsPivot.find(c=>c.key==="TOTAL_GERAL"), __stateKey:"coefPivot"});
+
+  // 4) render com classes sticky e cores condicionais
+  const pivotHTML = buildSortableTableHTML(
+    "coefPivot",
+    colsPivot,
+    rows,
+    (r)=>{
+      const tot = r["TOTAL_GERAL"];
+      const totCell = (tot==null) ? "—" : fmtBRL(tot);
+
+      // produto + total geral primeiro
+      const out = [
+        // PRODUTO
+        `<span>${r.produto}</span>`,
+        // Total geral
+        totCell
+      ];
+
+      // datas (desc) com cor vs total
+      for(const d of daysDesc){
+        const v = r[d];
+        if(v==null || !isFinite(v) || tot==null || !isFinite(tot)){
+          out.push("—");
+          continue;
+        }
+        const cls = (v > tot) ? "cell-hi" : (v < tot) ? "cell-lo" : "cell-eq";
+        out.push(`<span class="${cls}">${fmtBRL(v)}</span>`);
+      }
+      return out;
+    }
+  );
+
+  // injeta tabela e aplica classes sticky + quebra após Total geral
+  const wrap = document.getElementById("tbl_coef_pivot");
+  wrap.innerHTML = pivotHTML;
+
+  // aplica classes nos TH/TD (porque o builder é genérico)
+  // - coluna 0 = PRODUTO sticky
+  // - coluna 1 = TOTAL_GERAL sticky + quebra forte
+  const table = wrap.querySelector("table");
+  if(table){
+    table.classList.add("pivotTable");
+
+    // header
+    const ths = table.querySelectorAll("thead th");
+    if(ths[0]){
+      ths[0].classList.add("stickyL","col-prod");
+    }
+    if(ths[1]){
+      ths[1].classList.add("stickyL2","col-tot","breakAfter");
+    }
+
+    // body cells
+    table.querySelectorAll("tbody tr").forEach(tr=>{
+      const tds = tr.querySelectorAll("td");
+      if(tds[0]){
+        tds[0].classList.add("stickyL","col-prod");
+      }
+      if(tds[1]){
+        tds[1].classList.add("stickyL2","col-tot","breakAfter");
+      }
+    });
+  }
+
+  // bind sort (mantém seu comportamento: clicar no cabeçalho reordena)
+  // OBS: ao reordenar, precisamos re-render + reaplicar classes sticky/break.
+  // Para isso, sobrescrevemos o bind apenas deste pivot com um wrapper.
+  wrap.onclick = (ev)=>{
+    const th = ev.target.closest("th.sortable");
+    if(!th) return;
+    const colKey = th.getAttribute("data-col");
+    const col = colsPivot.find(c=>c.key===colKey);
+    if(!col) return;
+
+    col.__stateKey = "coefPivot";
+    sortRows(rows, col);
+
+    // re-render
+    wrap.innerHTML = buildSortableTableHTML(
+      "coefPivot",
+      colsPivot,
+      rows,
+      (r)=>{
+        const tot = r["TOTAL_GERAL"];
+        const out = [
+          `<span>${r.produto}</span>`,
+          (tot==null) ? "—" : fmtBRL(tot)
+        ];
+        for(const d of daysDesc){
+          const v = r[d];
+          if(v==null || !isFinite(v) || tot==null || !isFinite(tot)){
+            out.push("—");
+            continue;
+          }
+          const cls = (v > tot) ? "cell-hi" : (v < tot) ? "cell-lo" : "cell-eq";
+          out.push(`<span class="${cls}">${fmtBRL(v)}</span>`);
+        }
+        return out;
+      }
+    );
+
+    // reaplica sticky + quebra
+    const table2 = wrap.querySelector("table");
+    if(table2){
+      table2.classList.add("pivotTable");
+      const ths2 = table2.querySelectorAll("thead th");
+      if(ths2[0]) ths2[0].classList.add("stickyL","col-prod");
+      if(ths2[1]) ths2[1].classList.add("stickyL2","col-tot","breakAfter");
+
+      table2.querySelectorAll("tbody tr").forEach(tr=>{
+        const tds = tr.querySelectorAll("td");
+        if(tds[0]) tds[0].classList.add("stickyL","col-prod");
+        if(tds[1]) tds[1].classList.add("stickyL2","col-tot","breakAfter");
+      });
+    }
+  };
+
+} else {
+  document.getElementById("tbl_coef_pivot").innerHTML =
+    `<div class="muted small" style="padding:10px;">Sem dados para montar o pivot no período.</div>`;
+}
 /* =========================================================
    Persistência (compartilhar período/CSV com outras páginas)
 ========================================================= */
