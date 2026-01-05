@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Manirê | Reunião Semanal</title>
+<style>
+  :root{
+    --bg:#0b0f14; --card:#111826; --text:#e7eef7; --muted:#9db0c5; --line:#223044;
+    --good:#26a269; --bad:#e01b24; --warn:#f5c211;
+  }
+  body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  header h1{font-size:16px;margin:0;}
+  .muted{color:var(--muted);}
+  .small{font-size:11px;}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end; margin-left:auto;}
+  input[type="text"]{width:min(740px,92vw);padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1520;color:var(--text);}
+  .datebox{display:flex;flex-direction:column;gap:4px;}
+  .datebox input[type="date"]{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1520;color:var(--text);}
+  button{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#182234;color:var(--text);cursor:pointer;}
+  button:hover{filter:brightness(1.08);}
+  main{padding:16px 16px 26px;}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .span-3{grid-column:span 3;} .span-4{grid-column:span 4;} .span-5{grid-column:span 5;}
+  .span-6{grid-column:span 6;} .span-7{grid-column:span 7;} .span-8{grid-column:span 8;} .span-12{grid-column:span 12;}
+  @media (max-width:1100px){
+    .span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12;}
+    input[type="text"]{width:min(100%,92vw);}
+    .controls{margin-left:0;}
+  }
+
+  .kpi{display:flex;justify-content:space-between;gap:10px;align-items:baseline;}
+  .kpi .val{font-size:22px;font-weight:700;}
+  .kpi .lbl{color:var(--muted);font-size:12px;}
+  .tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
+
+  /* tabelas com scroll interno */
+  .tablewrap{
+    max-height:430px;
+    overflow:auto;             /* vertical + horizontal */
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#0f1520;
+  }
+  table{width:100%;border-collapse:collapse;font-size:12px;min-width:980px;}
+  th,td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;}
+  th{text-align:left;color:var(--muted);font-weight:600;position:sticky;top:0;background:#0f1520;z-index:1;}
+  .pos{color:var(--good);} .neg{color:var(--bad);}
+  .warn{color:var(--warn);font-weight:700;}
+  .sep-strong{
+    border-top:4px solid #2b3a52;
+    margin-top:12px;
+    padding-top:12px;
+  }
+
+  /* headers clicáveis para ordenação */
+  th.sortable{cursor:pointer; user-select:none;}
+  th.sortable:hover{filter:brightness(1.15);}
+  .sort-ind{margin-left:6px;color:var(--muted);font-size:11px;}
+
+  /* MENU (hambúrguer) */
+  .hambtn{
+    width:42px;height:42px;border-radius:12px;
+    display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--line);background:#0f1520;color:var(--text);cursor:pointer;
+  }
+  .hambtn:hover{filter:brightness(1.08);}
+  .drawerMask{
+    position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:50;
+  }
+  .drawer{
+    position:fixed;top:0;left:0;height:100%;width:min(320px,88vw);
+    background:#0f1520;border-right:1px solid var(--line);
+    transform:translateX(-102%);transition:transform .18s ease;
+    z-index:60;padding:14px;
+  }
+  .drawer.open{transform:translateX(0);}
+  .drawerMask.open{display:block;}
+  .drawer h2{margin:6px 0 10px 0;font-size:14px;}
+  .navlink{
+    display:block;padding:10px 10px;border-radius:10px;
+    border:1px solid transparent;color:var(--text);text-decoration:none;
+    background:transparent;
+  }
+  .navlink:hover{border-color:var(--line);background:#111826;}
+  .drawer .muted{margin:6px 0 10px 0;}
+  .pill{
+    display:inline-block;margin-top:8px;padding:6px 10px;border-radius:999px;
+    border:1px solid var(--line);color:var(--muted);font-size:12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<div id="drawerMask" class="drawerMask" onclick="closeDrawer()"></div>
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <h2>Navegação</h2>
+    <button class="hambtn" type="button" onclick="closeDrawer()" title="Fechar">✕</button>
+  </div>
+
+  <div class="muted small">
+    O período e o CSV são compartilhados entre páginas.
+  </div>
+
+  <a class="navlink" href="./dashboard_manire_entrada_v4.html">Dashboard — Entradas In Natura</a>
+  <a class="navlink" href="./dashboard_reuniao_semanal_v1.html"><b>Reunião Semanal</b></a>
+
+  <div class="pill" id="pillPeriod">Período: —</div>
+</aside>
+
+<header>
+  <button class="hambtn" type="button" onclick="openDrawer()" title="Menu">☰</button>
+
+  <div style="flex:1 1 auto; min-width:240px;">
+    <h1>Reunião Semanal — Bloco COEFICIENTE</h1>
+    <div class="muted small" id="meta">Carregue o CSV publicado do Google Sheets (output=csv). O período é o mesmo do dashboard principal.</div>
+  </div>
+
+  <div class="controls">
+    <input id="csvUrl" type="text" />
+
+    <label class="datebox small muted">
+      Data inicial
+      <input id="dateStart" type="date" />
+    </label>
+
+    <label class="datebox small muted">
+      Data final
+      <input id="dateEnd" type="date" />
+    </label>
+
+    <button type="button" onclick="applyDateFilter()">Aplicar período</button>
+    <button type="button" onclick="loadData()">Atualizar</button>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+
+    <div class="card span-3">
+      <div class="kpi">
+        <div>
+          <div class="lbl">Linhas (período)</div>
+          <div class="val" id="kpi_rows">—</div>
+        </div>
+        <span class="tag" id="kpi_range">—</span>
+      </div>
+    </div>
+
+    <div class="card span-3">
+      <div class="kpi">
+        <div>
+          <div class="lbl">Produtos distintos</div>
+          <div class="val" id="kpi_prod">—</div>
+        </div>
+        <span class="tag" id="kpi_top20k">—</span>
+      </div>
+    </div>
+
+    <div class="card span-3">
+      <div class="kpi">
+        <div>
+          <div class="lbl">% COEF (Top 20 por KG)</div>
+          <div class="val" id="kpi_coef">—</div>
+        </div>
+        <span class="tag" id="kpi_coef_note">Fórmula: 1 − Σ(DIF_EX_MIN)/Σ(DIF_PREÇOS)</span>
+      </div>
+    </div>
+
+    <div class="card span-3">
+      <div class="kpi">
+        <div>
+          <div class="lbl">Janela (4 semanas)</div>
+          <div class="val" id="kpi_4w">—</div>
+        </div>
+        <span class="tag" id="kpi_lastdate">—</span>
+      </div>
+    </div>
+
+    <div class="card span-12">
+      <div class="muted small">
+        <b>DEBUG (automático):</b> <span id="dbg_cols">—</span><br/>
+        <span id="dbg_lastcols">—</span>
+      </div>
+    </div>
+
+    <!-- DASH 1 -->
+    <div class="card span-12">
+      <h3 style="margin:0 0 8px 0;">1) Top 20 produtos mais comprados (KG) — com % COEF</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Regras:
+        <b>KILOS</b> = soma de <b>KILO</b>. <b>MIN/MAX</b> = mínimo/máximo de <b>R$.KG</b>.
+        <b>DIF_PREÇOS</b> = MAX−MIN. <b>EX_PON</b> = média ponderada por KG.
+        <b>DIF_EX_MIN</b> = EX_PON−MIN.
+        <b>%COEF</b> = 1 − (DIF_EX_MIN / DIF_PREÇOS).
+        Ordene clicando nos cabeçalhos.
+      </div>
+      <div class="tablewrap" id="tbl_coef_top20"></div>
+
+      <div class="sep-strong"></div>
+
+      <!-- DASH 2 -->
+      <h3 style="margin:12px 0 8px 0;">2) Top 20 itens — valores pagos por KG por dia (pivot)</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Linhas = produto (Top 20 por KG no período). Colunas = datas do período. Valores = média ponderada de <b>R$.KG</b> por KG no dia.
+        Ordene clicando no cabeçalho (ex.: “Total geral”).
+      </div>
+      <div class="tablewrap" id="tbl_coef_pivot"></div>
+
+      <div class="sep-strong"></div>
+
+      <!-- DASH 3 -->
+      <h3 style="margin:12px 0 8px 0;">3) Resumo — % COEF das últimas 4 semanas</h3>
+      <div class="muted small" style="margin-bottom:10px;">
+        Para cada semana: calcula Top 20 por KG (da semana) e aplica a mesma lógica do COEF.
+      </div>
+      <div class="tablewrap" id="tbl_coef_4w"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+/* =========================================================
+   Persistência (compartilhar período/CSV com outras páginas)
+========================================================= */
+const LS_CSV  = "manire_csvUrl";
+const LS_S0   = "manire_dateStart";
+const LS_S1   = "manire_dateEnd";
+
+function saveSharedState(){
+  localStorage.setItem(LS_CSV, document.getElementById("csvUrl").value.trim());
+  localStorage.setItem(LS_S0, document.getElementById("dateStart").value || "");
+  localStorage.setItem(LS_S1, document.getElementById("dateEnd").value || "");
+  updateDrawerPill();
+}
+
+function loadSharedStateDefaults(){
+  const defCsv = localStorage.getItem(LS_CSV) || "";
+  const defS0  = localStorage.getItem(LS_S0) || "";
+  const defS1  = localStorage.getItem(LS_S1) || "";
+
+  const csvEl = document.getElementById("csvUrl");
+  if(defCsv) csvEl.value = defCsv;
+  else {
+    // fallback (se ainda não houver localStorage)
+    csvEl.value = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTr68Lpc3SFv05Wn28gQ3iBCk0jmRdRrWVGM49AE-3bVYR4poLY30Jxfaht2JDgUE5zyNx8vl55nAG2/pub?gid=625178800&single=true&output=csv";
+  }
+
+  if(defS0) document.getElementById("dateStart").value = defS0;
+  if(defS1) document.getElementById("dateEnd").value = defS1;
+
+  updateDrawerPill();
+}
+
+function updateDrawerPill(){
+  const s0 = document.getElementById("dateStart").value;
+  const s1 = document.getElementById("dateEnd").value;
+  const pill = document.getElementById("pillPeriod");
+  if(!pill) return;
+  if(s0 && s1){
+    pill.textContent = `Período: ${new Date(s0).toLocaleDateString("pt-BR")} → ${new Date(s1).toLocaleDateString("pt-BR")}`;
+  } else {
+    pill.textContent = "Período: —";
+  }
+}
+
+/* =========================================================
+   MENU Drawer
+========================================================= */
+function openDrawer(){
+  document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawerMask").classList.add("open");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+}
+function closeDrawer(){
+  document.getElementById("drawer").classList.remove("open");
+  document.getElementById("drawerMask").classList.remove("open");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
+}
+
+/* =========================
+   Estado + parsing
+========================= */
+let ALL_DATA = [];
+let MIN_DATE = null;
+let MAX_DATE = null;
+let RAW_HEADER = [];
+
+/* CSV parser (simples) */
+function parseCSV(text){
+  const rows=[];
+  let row=[], cell="", inQuotes=false;
+
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c === '"'){
+      if(inQuotes && text[i+1] === '"'){ cell+='"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if(c === ',' && !inQuotes){
+      row.push(cell); cell="";
+    } else if((c === '\n' || c === '\r') && !inQuotes){
+      if(c === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); cell="";
+      if(row.some(x => String(x||"").trim() !== "")) rows.push(row);
+      row=[];
+    } else {
+      cell += c;
+    }
+  }
+  row.push(cell);
+  if(row.some(x => String(x||"").trim() !== "")) rows.push(row);
+  return rows;
+}
+
+/* Normalização de cabeçalho */
+function normHeader(s){
+  return String(s||"")
+    .replace(/\u00A0/g," ")
+    .trim()
+    .replace(/\s+/g," ")
+    .toUpperCase();
+}
+function makeIndexMap(header){
+  const idx = new Map();
+  header.forEach((h,i)=>{
+    const key = normHeader(h);
+    if(key && !idx.has(key)) idx.set(key,i);
+  });
+  return idx;
+}
+function colAny(idx, candidates){
+  for(const c of candidates){
+    const k = normHeader(c);
+    if(idx.has(k)) return idx.get(k);
+  }
+  return null;
+}
+
+/* Format */
+function fmtBRL(x){
+  if(x==null || !isFinite(x)) return "—";
+  return x.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+}
+function fmtNum(x,d=2){
+  if(x==null || !isFinite(x)) return "—";
+  return x.toLocaleString("pt-BR",{maximumFractionDigits:d});
+}
+function fmtPctText(x,d=2){
+  if(x==null || !isFinite(x)) return "—";
+  return (x*100).toFixed(d) + "%";
+}
+function fmtPctHTML(x,d=2){
+  if(x==null || !isFinite(x)) return "—";
+  const s=(x*100).toFixed(d)+"%";
+  return `<span class="${x>=0?'pos':'neg'}">${s}</span>`;
+}
+
+/* Parsing numérico e data */
+function toNum(v){
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(!s) return null;
+  const clean = s
+    .replace(/\u00A0/g," ")
+    .replace(/\s/g,"")
+    .replace(/R\$/gi,"")
+    .replace(/\./g,"")
+    .replace(",",".")
+    .replace(/[^\d.-]/g,"");
+  const n=Number(clean);
+  return isFinite(n)?n:null;
+}
+function toDate(v){
+  if(!v) return null;
+  const s=String(v).trim();
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+  const d=new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function toISO(d){ return d.toISOString().slice(0,10); }
+
+/* =========================
+   Date filter helpers
+========================= */
+function setDateInputsFromData(data){
+  const ds=data.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
+  if(!ds.length) return;
+
+  MIN_DATE=ds[0]; MAX_DATE=ds[ds.length-1];
+
+  const startEl=document.getElementById("dateStart");
+  const endEl=document.getElementById("dateEnd");
+
+  startEl.min=toISO(MIN_DATE); startEl.max=toISO(MAX_DATE);
+  endEl.min=toISO(MIN_DATE);   endEl.max=toISO(MAX_DATE);
+
+  if(!startEl.value) startEl.value=toISO(MIN_DATE);
+  if(!endEl.value) endEl.value=toISO(MAX_DATE);
+
+  document.getElementById("kpi_range").textContent =
+    `${new Date(startEl.value).toLocaleDateString("pt-BR")} → ${new Date(endEl.value).toLocaleDateString("pt-BR")}`;
+
+  document.getElementById("kpi_lastdate").textContent =
+    `até ${new Date(endEl.value).toLocaleDateString("pt-BR")}`;
+
+  updateDrawerPill();
+  saveSharedState();
+}
+
+function getSelectedDateRange(){
+  const s = document.getElementById("dateStart").value ? new Date(document.getElementById("dateStart").value+"T00:00:00") : null;
+  const e = document.getElementById("dateEnd").value ? new Date(document.getElementById("dateEnd").value+"T23:59:59") : null;
+  return {s,e};
+}
+function filterBySelectedDates(data){
+  const {s,e}=getSelectedDateRange();
+  if(!s||!e) return data;
+  return data.filter(x=>x.data && x.data>=s && x.data<=e);
+}
+function applyDateFilter(){
+  if(!ALL_DATA.length){ alert("Carregue o CSV primeiro (Atualizar)."); return; }
+  saveSharedState();
+  renderPage(filterBySelectedDates(ALL_DATA));
+}
+
+/* =========================
+   Ordenação por clique em TH (reutilizável por tabela)
+   - tableId: id do container (.tablewrap)
+   - stateKey: nome único para guardar estado do sort
+   - columns: [{key, type, label}]
+   - rows: array de objetos
+   - renderRow: fn(obj)->array de células HTML
+========================= */
+const SORT_STATE = {}; // stateKey -> {key, dir}
+function sortRows(rows, col){
+  const {key, type} = col;
+  const st = SORT_STATE[col.__stateKey] || {key:null, dir:1};
+  const nextDir = (st.key === key) ? -st.dir : 1; // alterna
+  SORT_STATE[col.__stateKey] = {key, dir: nextDir};
+
+  const dir = nextDir;
+
+  const getVal = (r)=>{
+    const v = r[key];
+    if(type==="num") return (v==null || !isFinite(v)) ? -Infinity : Number(v);
+    if(type==="date") return (v instanceof Date) ? v.getTime() : (v ? new Date(v).getTime() : -Infinity);
+    return (v==null) ? "" : String(v).toUpperCase();
+  };
+
+  rows.sort((a,b)=>{
+    const va=getVal(a), vb=getVal(b);
+    if(type==="str"){
+      if(va<vb) return -1*dir;
+      if(va>vb) return  1*dir;
+      return 0;
+    }
+    return (va - vb) * dir;
+  });
+}
+
+function buildSortableTableHTML(stateKey, columns, rowObjs, renderRow){
+  // injeta stateKey no metadata de coluna
+  const cols = columns.map(c => ({...c, __stateKey: stateKey}));
+
+  // cabeçalho com indicadores
+  const st = SORT_STATE[stateKey] || {key:null, dir:1};
+
+  let html = `<table><thead><tr>`;
+  for(const c of cols){
+    const isActive = (st.key === c.key);
+    const ind = isActive ? (st.dir===1 ? "▲" : "▼") : "";
+    html += `<th class="sortable" data-skey="${stateKey}" data-col="${c.key}">
+              ${c.label}<span class="sort-ind">${ind}</span>
+            </th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  for(const r of rowObjs){
+    const cells = renderRow(r);
+    html += `<tr>`;
+    for(const cell of cells) html += `<td>${cell}</td>`;
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+  return html;
+}
+
+function bindSortClicks(containerId, stateKey, columns, rowObjs, renderRow){
+  const wrap = document.getElementById(containerId);
+  if(!wrap) return;
+
+  wrap.onclick = (ev)=>{
+    const th = ev.target.closest("th.sortable");
+    if(!th) return;
+    const colKey = th.getAttribute("data-col");
+    const col = columns.find(c=>c.key===colKey);
+    if(!col) return;
+
+    // ordena e re-render
+    col.__stateKey = stateKey;
+    sortRows(rowObjs, col);
+    wrap.innerHTML = buildSortableTableHTML(stateKey, columns, rowObjs, renderRow);
+  };
+}
+
+/* =========================
+   Load data
+========================= */
+async function loadData(){
+  const url=document.getElementById("csvUrl").value.trim();
+  if(!url){ alert("Cole a URL CSV publicada (output=csv)."); return; }
+
+  saveSharedState();
+
+  document.getElementById("meta").textContent="Carregando CSV...";
+  document.getElementById("tbl_coef_top20").innerHTML="";
+  document.getElementById("tbl_coef_pivot").innerHTML="";
+  document.getElementById("tbl_coef_4w").innerHTML="";
+
+  let raw;
+  try{
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    raw=parseCSV(await r.text());
+  }catch(err){
+    console.error(err);
+    document.getElementById("meta").textContent="Falha ao carregar CSV. Verifique se a URL termina com output=csv.";
+    alert("Falha ao carregar CSV.\n\nConfirme que sua URL é do tipo:\n.../pub?gid=XXXX&single=true&output=csv");
+    return;
+  }
+
+  if(!raw || !raw.length){
+    document.getElementById("meta").textContent="CSV vazio.";
+    return;
+  }
+
+  RAW_HEADER = raw[0].map(h=>String(h||"").replace(/\u00A0/g," ").trim());
+  const idx = makeIndexMap(RAW_HEADER);
+
+  // DEBUG
+  document.getElementById("dbg_cols").innerHTML = `Colunas no CSV: <b>${RAW_HEADER.length}</b>`;
+  const tail = RAW_HEADER.slice(Math.max(0, RAW_HEADER.length-14));
+  document.getElementById("dbg_lastcols").innerHTML = `Últimas colunas: <code>${tail.join(" | ")}</code>`;
+
+  // colunas necessárias para COEF
+  const cData = colAny(idx, ["DATA"]);
+  const cProd = colAny(idx, ["PRODUTO"]);
+  const cKilo = colAny(idx, ["KILO"]);
+  const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG"]);
+
+  if(cData==null || cProd==null || cKilo==null || cRkg==null){
+    alert("Não encontrei todas as colunas necessárias: DATA, PRODUTO, KILO, R$.KG.\nVerifique o cabeçalho no DEBUG.");
+    document.getElementById("meta").textContent="Erro: faltam colunas para o bloco COEFICIENTE.";
+    return;
+  }
+
+  const rows = raw.slice(1).filter(r => r.some(x => String(x||"").trim() !== ""));
+  const data = rows.map(r=>{
+    const d = toDate(r[cData]);
+    const produto = String(r[cProd]||"").trim();
+    const kilo = toNum(r[cKilo]);
+    const rkg  = toNum(r[cRkg]);
+    return { data:d, dataISO: d?toISO(d):null, produto, kilo, rkg };
+  }).filter(x=>x.data && x.produto);
+
+  ALL_DATA = data;
+
+  setDateInputsFromData(ALL_DATA);
+  renderPage(filterBySelectedDates(ALL_DATA));
+}
+
+/* =========================
+   COEF helpers
+========================= */
+function weightedAvg(sumPxK, sumK){
+  if(sumK==null || !isFinite(sumK) || sumK<=0) return null;
+  return sumPxK / sumK;
+}
+
+/**
+ * Gera agregados por produto:
+ * - kilos (Σ KILO)
+ * - min/max rkg
+ * - ex_pon (média ponderada por KG)
+ * - dif_precos (max-min)
+ * - dif_ex_min (ex_pon - min)
+ * - coef = 1 - dif_ex_min/dif_precos
+ */
+function buildTop20CoefAgg(dataFiltered){
+  const byProd = new Map();
+
+  for(const r of dataFiltered){
+    const k = (r.kilo==null || !isFinite(r.kilo)) ? 0 : r.kilo;
+    const p = r.produto;
+    if(!byProd.has(p)){
+      byProd.set(p, {
+        produto:p,
+        kilos:0,
+        min_rkg:null,
+        max_rkg:null,
+        sumPxK:0,
+        sumK:0
+      });
+    }
+    const g = byProd.get(p);
+
+    // kilos
+    g.kilos += k;
+
+    // preços
+    if(r.rkg!=null && isFinite(r.rkg)){
+      g.min_rkg = (g.min_rkg==null) ? r.rkg : Math.min(g.min_rkg, r.rkg);
+      g.max_rkg = (g.max_rkg==null) ? r.rkg : Math.max(g.max_rkg, r.rkg);
+      if(k>0){
+        g.sumPxK += r.rkg * k;
+        g.sumK   += k;
+      }
+    }
+  }
+
+  let arr = Array.from(byProd.values());
+  arr.sort((a,b)=> (b.kilos - a.kilos));
+  arr = arr.slice(0,20);
+
+  // completa métricas
+  for(const g of arr){
+    g.ex_pon = weightedAvg(g.sumPxK, g.sumK);
+    g.dif_precos = (g.min_rkg!=null && g.max_rkg!=null) ? (g.max_rkg - g.min_rkg) : null;
+    g.dif_ex_min = (g.ex_pon!=null && g.min_rkg!=null) ? (g.ex_pon - g.min_rkg) : null;
+    g.coef = (g.dif_precos!=null && isFinite(g.dif_precos) && g.dif_precos>0 && g.dif_ex_min!=null && isFinite(g.dif_ex_min))
+      ? (1 - (g.dif_ex_min / g.dif_precos))
+      : null;
+  }
+
+  // coef total do bloco (igual sua lógica Q3/R3/T3):
+  // Q3 = Σ DIF_PREÇOS onde DIF_EX_MIN > 0
+  // R3 = Σ DIF_EX_MIN
+  // T3 = 1 - R3/Q3
+  const sumQ = arr
+    .filter(x => x.dif_ex_min!=null && isFinite(x.dif_ex_min) && x.dif_ex_min > 0)
+    .map(x => x.dif_precos)
+    .filter(v => v!=null && isFinite(v) && v>0)
+    .reduce((s,v)=>s+v,0);
+
+  const sumR = arr
+    .map(x => x.dif_ex_min)
+    .filter(v => v!=null && isFinite(v) && v>0)
+    .reduce((s,v)=>s+v,0);
+
+  const coefTotal = (sumQ>0) ? (1 - (sumR/sumQ)) : null;
+
+  return { top20: arr, coefTotal, sumQ, sumR };
+}
+
+/* =========================
+   Pivot (produto x data)
+========================= */
+function buildPivotTop20(dataFiltered, top20List, dateMin, dateMax){
+  const topSet = new Set(top20List.map(x=>x.produto));
+
+  // lista de datas no período (ordenadas)
+  const days = [];
+  const d0 = new Date(dateMin.getFullYear(), dateMin.getMonth(), dateMin.getDate());
+  const d1 = new Date(dateMax.getFullYear(), dateMax.getMonth(), dateMax.getDate());
+  for(let d=new Date(d0); d<=d1; d.setDate(d.getDate()+1)){
+    days.push(toISO(d));
+  }
+
+  // map produto -> map dia -> {sumPxK, sumK}
+  const grid = new Map();
+  for(const p of topSet) grid.set(p, new Map());
+
+  for(const r of dataFiltered){
+    if(!topSet.has(r.produto)) continue;
+    if(r.rkg==null || !isFinite(r.rkg) || r.kilo==null || !isFinite(r.kilo) || r.kilo<=0) continue;
+    const iso = r.dataISO;
+    if(!iso) continue;
+
+    const m = grid.get(r.produto);
+    if(!m.has(iso)) m.set(iso, {sumPxK:0, sumK:0});
+    const cell = m.get(iso);
+    cell.sumPxK += r.rkg * r.kilo;
+    cell.sumK   += r.kilo;
+  }
+
+  // monta linhas pivot
+  const rows = [];
+  for(const g of top20List){
+    const p = g.produto;
+    const m = grid.get(p) || new Map();
+
+    // total geral (ponderado)
+    let tSumPxK=0, tSumK=0;
+
+    const row = { produto:p };
+    for(const day of days){
+      const cell = m.get(day);
+      const v = cell ? weightedAvg(cell.sumPxK, cell.sumK) : null;
+      row[day] = v;
+      if(cell){
+        tSumPxK += cell.sumPxK;
+        tSumK   += cell.sumK;
+      }
+    }
+    row["TOTAL_GERAL"] = weightedAvg(tSumPxK, tSumK);
+    rows.push(row);
+  }
+
+  return { days, rows };
+}
+
+/* =========================
+   Últimas 4 semanas (%COEF)
+========================= */
+function startOfISOWeek(date){
+  // ISO: segunda = 1 ... domingo = 7
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0=dom,1=seg...
+  const iso = (day===0) ? 7 : day;
+  d.setDate(d.getDate() - (iso-1)); // volta para segunda
+  return d;
+}
+
+function addDays(d, n){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate()+n);
+  return x;
+}
+
+function buildLast4WeeksCoef(allDataFiltered, endDate){
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  const w0 = startOfISOWeek(end); // semana do end
+  const weeks = [];
+
+  // pega 4 semanas (inclui semana do end, e as 3 anteriores)
+  for(let i=0;i<4;i++){
+    const ws = addDays(w0, -7*i);
+    const we = addDays(ws, 6);
+    weeks.push({ ws, we });
+  }
+  weeks.reverse(); // do mais antigo -> mais recente
+
+  const rows = [];
+  for(const w of weeks){
+    const wData = allDataFiltered.filter(r => r.data>=w.ws && r.data<=addDays(w.we,0));
+    const {coefTotal, top20} = buildTop20CoefAgg(wData);
+    const kgTop20 = top20.map(x=>x.kilos).filter(v=>v!=null).reduce((s,v)=>s+v,0);
+
+    rows.push({
+      semana: `${w.ws.toLocaleDateString("pt-BR")} → ${w.we.toLocaleDateString("pt-BR")}`,
+      coef: coefTotal,
+      top20kg: kgTop20,
+      linhas: wData.length
+    });
+  }
+
+  return rows;
+}
+
+/* =========================
+   Render page
+========================= */
+function renderPage(dataFiltered){
+  const datesSel = dataFiltered.map(x=>x.data).filter(Boolean).sort((a,b)=>a-b);
+  const selMin = datesSel.length ? datesSel[0] : null;
+  const selMax = datesSel.length ? datesSel[datesSel.length-1] : null;
+
+  // KPIs base
+  document.getElementById("kpi_rows").textContent = fmtNum(dataFiltered.length,0);
+  document.getElementById("kpi_prod").textContent = fmtNum(new Set(dataFiltered.map(x=>x.produto)).size,0);
+
+  if(selMin && selMax){
+    document.getElementById("kpi_range").textContent =
+      `${selMin.toLocaleDateString("pt-BR")} → ${selMax.toLocaleDateString("pt-BR")}`;
+    document.getElementById("pillPeriod").textContent =
+      `Período: ${selMin.toLocaleDateString("pt-BR")} → ${selMax.toLocaleDateString("pt-BR")}`;
+  } else {
+    document.getElementById("kpi_range").textContent = "—";
+  }
+
+  // ===== 1) Top 20 COEF =====
+  const { top20, coefTotal } = buildTop20CoefAgg(dataFiltered);
+
+  document.getElementById("kpi_top20k").textContent = top20.length ? `Top 20: ${fmtNum(top20.length,0)}` : "Top 20: —";
+  document.getElementById("kpi_coef").textContent = (coefTotal==null) ? "—" : fmtPctText(coefTotal,2);
+  document.getElementById("kpi_4w").textContent = selMax ? "últimas 4 semanas" : "—";
+  document.getElementById("kpi_lastdate").textContent = selMax ? `até ${selMax.toLocaleDateString("pt-BR")}` : "—";
+
+  // tabela top20 (sortable)
+  const top20Rows = top20.map(x=>({
+    produto:x.produto,
+    kilos:x.kilos,
+    min_rkg:x.min_rkg,
+    max_rkg:x.max_rkg,
+    dif_precos:x.dif_precos,
+    dif_ex_min:x.dif_ex_min,
+    ex_pon:x.ex_pon,
+    coef:x.coef
+  }));
+
+  const colsTop20 = [
+    {key:"produto", type:"str", label:"PRODUTO"},
+    {key:"kilos", type:"num", label:"KILOS"},
+    {key:"min_rkg", type:"num", label:"MIN R$.KG"},
+    {key:"max_rkg", type:"num", label:"MAX R$.KG"},
+    {key:"dif_precos", type:"num", label:"DIF. PREÇOS"},
+    {key:"dif_ex_min", type:"num", label:"DIF EX-MIN"},
+    {key:"ex_pon", type:"num", label:"EX. PON."},
+    {key:"coef", type:"num", label:"% COEF."}
+  ];
+
+  // default sort: kilos desc
+  SORT_STATE["coefTop20"] = {key:"kilos", dir:-1};
+  // aplica o sort default uma vez
+  sortRows(top20Rows, {...colsTop20.find(c=>c.key==="kilos"), __stateKey:"coefTop20"});
+
+  const top20HTML = buildSortableTableHTML(
+    "coefTop20",
+    colsTop20,
+    top20Rows,
+    (r)=>[
+      r.produto,
+      fmtNum(r.kilos,0),
+      fmtBRL(r.min_rkg),
+      fmtBRL(r.max_rkg),
+      fmtBRL(r.dif_precos),
+      fmtBRL(r.dif_ex_min),
+      fmtBRL(r.ex_pon),
+      (r.coef==null) ? "—" : fmtPctHTML(r.coef,2)
+    ]
+  );
+  document.getElementById("tbl_coef_top20").innerHTML = top20HTML;
+  bindSortClicks("tbl_coef_top20", "coefTop20", colsTop20, top20Rows, (r)=>[
+    r.produto, fmtNum(r.kilos,0), fmtBRL(r.min_rkg), fmtBRL(r.max_rkg),
+    fmtBRL(r.dif_precos), fmtBRL(r.dif_ex_min), fmtBRL(r.ex_pon),
+    (r.coef==null) ? "—" : fmtPctHTML(r.coef,2)
+  ]);
+
+  // ===== 2) Pivot por dia (top20) =====
+  if(selMin && selMax && top20.length){
+    const { days, rows } = buildPivotTop20(dataFiltered, top20, selMin, selMax);
+
+    const colsPivot = [
+      {key:"produto", type:"str", label:"PRODUTO"},
+      ...days.map(d=>({key:d, type:"num", label:new Date(d).toLocaleDateString("pt-BR")})),
+      {key:"TOTAL_GERAL", type:"num", label:"Total geral"}
+    ];
+
+    // default sort: TOTAL_GERAL desc
+    SORT_STATE["coefPivot"] = {key:"TOTAL_GERAL", dir:-1};
+    sortRows(rows, {...colsPivot.find(c=>c.key==="TOTAL_GERAL"), __stateKey:"coefPivot"});
+
+    const pivotHTML = buildSortableTableHTML(
+      "coefPivot",
+      colsPivot,
+      rows,
+      (r)=>[
+        r.produto,
+        ...days.map(d=> r[d]==null ? "—" : fmtBRL(r[d])),
+        r["TOTAL_GERAL"]==null ? "—" : fmtBRL(r["TOTAL_GERAL"])
+      ]
+    );
+    document.getElementById("tbl_coef_pivot").innerHTML = pivotHTML;
+    bindSortClicks("tbl_coef_pivot", "coefPivot", colsPivot, rows, (r)=>[
+      r.produto,
+      ...days.map(d=> r[d]==null ? "—" : fmtBRL(r[d])),
+      r["TOTAL_GERAL"]==null ? "—" : fmtBRL(r["TOTAL_GERAL"])
+    ]);
+  } else {
+    document.getElementById("tbl_coef_pivot").innerHTML =
+      `<div class="muted small" style="padding:10px;">Sem dados para montar o pivot no período.</div>`;
+  }
+
+  // ===== 3) Últimas 4 semanas =====
+  if(selMax){
+    const last4w = buildLast4WeeksCoef(dataFiltered, selMax);
+    const cols4w = [
+      {key:"semana", type:"str", label:"Semana"},
+      {key:"coef", type:"num", label:"% COEF (Top 20)"},
+      {key:"top20kg", type:"num", label:"KG (Top 20)"},
+      {key:"linhas", type:"num", label:"Linhas"}
+    ];
+
+    // default: semana asc (já vem ordenado), mas deixo ordenável
+    SORT_STATE["coef4w"] = {key:"semana", dir:1};
+
+    const html4w = buildSortableTableHTML(
+      "coef4w",
+      cols4w,
+      last4w,
+      (r)=>[
+        r.semana,
+        (r.coef==null) ? "—" : fmtPctHTML(r.coef,2),
+        fmtNum(r.top20kg,0),
+        fmtNum(r.linhas,0)
+      ]
+    );
+    document.getElementById("tbl_coef_4w").innerHTML = html4w;
+    bindSortClicks("tbl_coef_4w", "coef4w", cols4w, last4w, (r)=>[
+      r.semana,
+      (r.coef==null) ? "—" : fmtPctHTML(r.coef,2),
+      fmtNum(r.top20kg,0),
+      fmtNum(r.linhas,0)
+    ]);
+  } else {
+    document.getElementById("tbl_coef_4w").innerHTML =
+      `<div class="muted small" style="padding:10px;">Sem datas suficientes para calcular as 4 semanas.</div>`;
+  }
+
+  document.getElementById("meta").textContent =
+    `OK — ${fmtNum(dataFiltered.length,0)} linhas no período. ` +
+    `Ordene clicando nos cabeçalhos (Top 20 / Pivot / 4 semanas).`;
+}
+
+/* boot */
+loadSharedStateDefaults();
+// se quiser carregar automático ao abrir:
+window.addEventListener("load", loadData);
+</script>
+
+</body>
+</html>
