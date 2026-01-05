@@ -36,10 +36,9 @@
   .kpi .lbl{color:var(--muted);font-size:12px;}
   .tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
 
-  /* tabelas com scroll interno */
   .tablewrap{
     max-height:430px;
-    overflow:auto;             /* vertical + horizontal */
+    overflow:auto;
     border:1px solid var(--line);
     border-radius:12px;
     background:#0f1520;
@@ -55,12 +54,10 @@
     padding-top:12px;
   }
 
-  /* headers clicáveis para ordenação */
   th.sortable{cursor:pointer; user-select:none;}
   th.sortable:hover{filter:brightness(1.15);}
   .sort-ind{margin-left:6px;color:var(--muted);font-size:11px;}
 
-  /* MENU (hambúrguer) */
   .hambtn{
     width:42px;height:42px;border-radius:12px;
     display:inline-flex;align-items:center;justify-content:center;
@@ -90,12 +87,12 @@
     display:inline-block;margin-top:8px;padding:6px 10px;border-radius:999px;
     border:1px solid var(--line);color:var(--muted);font-size:12px;
   }
+
   /* =========================
      PIVOT: sticky 2 primeiras colunas + quebra visual
      ========================= */
-  .pivotTable{ min-width:1200px; } /* garante espaço p/ scroll lateral */
+  .pivotTable{ min-width:1200px; }
 
-  /* sticky para PRODUTO e TOTAL */
   th.stickyL, td.stickyL{
     position:sticky;
     left:0;
@@ -104,35 +101,29 @@
   }
   th.stickyL2, td.stickyL2{
     position:sticky;
-    left:220px;               /* largura da coluna PRODUTO (ajuste abaixo) */
+    left:220px;
     z-index:3;
     background:#0f1520;
   }
 
-  /* largura fixa para manter o "comparativo" estável */
   th.col-prod, td.col-prod{ min-width:220px; max-width:220px; }
   th.col-tot,  td.col-tot { min-width:140px; max-width:140px; text-align:right; }
 
-  /* quebra forte após Total geral */
   th.breakAfter, td.breakAfter{
     border-right:4px solid #2b3a52 !important;
     background:rgba(157,176,197,.06);
   }
 
-  /* cores condicionais vs Total geral */
-  .cell-hi{ color:var(--bad); font-weight:700; }  /* > total */
-  .cell-lo{ color:var(--good); font-weight:700; } /* < total */
-  .cell-eq{ color:var(--muted); font-weight:600; } /* = total */
+  .cell-hi{ color:var(--bad); font-weight:700; }
+  .cell-lo{ color:var(--good); font-weight:700; }
+  .cell-eq{ color:var(--muted); font-weight:600; }
 
-  /* mantém cabeçalho sticky sem "vazar" por cima das colunas sticky */
   th{ z-index:1; }
   th.stickyL, th.stickyL2{ z-index:4; }
-
 </style>
 </head>
 <body>
 
-<!-- MENU -->
 <div id="drawerMask" class="drawerMask" onclick="closeDrawer()"></div>
 <aside id="drawer" class="drawer" aria-hidden="true">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -226,7 +217,6 @@
       </div>
     </div>
 
-    <!-- DASH 1 -->
     <div class="card span-12">
       <h3 style="margin:0 0 8px 0;">1) Top 20 produtos mais comprados (KG) — com % COEF</h3>
       <div class="muted small" style="margin-bottom:10px;">
@@ -241,7 +231,6 @@
 
       <div class="sep-strong"></div>
 
-      <!-- DASH 2 -->
       <h3 style="margin:12px 0 8px 0;">2) Top 20 itens — valores pagos por KG por dia (pivot)</h3>
       <div class="muted small" style="margin-bottom:10px;">
         Linhas = produto (Top 20 por KG no período). Colunas = datas do período. Valores = média ponderada de <b>R$.KG</b> por KG no dia.
@@ -251,7 +240,6 @@
 
       <div class="sep-strong"></div>
 
-      <!-- DASH 3 -->
       <h3 style="margin:12px 0 8px 0;">3) Resumo — % COEF das últimas 4 semanas</h3>
       <div class="muted small" style="margin-bottom:10px;">
         Para cada semana: calcula Top 20 por KG (da semana) e aplica a mesma lógica do COEF.
@@ -263,155 +251,6 @@
 </main>
 
 <script>
-  /* =========================================================
-   PIVOT: ajustes solicitados
-   - ordem de colunas: PRODUTO | Total geral | datas (mais recente -> mais antiga)
-   - sticky: PRODUTO e Total geral
-   - cor: compara cada dia com Total geral
-========================================================= */
-
-/* SUBSTITUA a parte do render do PIVOT dentro de renderPage(dataFiltered)
-   por este bloco (somente o trecho do "===== 2) Pivot por dia (top20) =====")
-*/
-
-if(selMin && selMax && top20.length){
-  // buildPivotTop20 já existe no seu código
-  let { days, rows } = buildPivotTop20(dataFiltered, top20, selMin, selMax);
-
-  // 1) datas em ordem decrescente (mais atuais -> mais antigas)
-  const daysDesc = [...days].reverse();
-
-  // 2) colunas: PRODUTO | Total geral | datas (desc)
-  const colsPivot = [
-    {key:"produto", type:"str", label:"PRODUTO"},
-    {key:"TOTAL_GERAL", type:"num", label:"Total geral"},
-    ...daysDesc.map(d=>({key:d, type:"num", label:new Date(d).toLocaleDateString("pt-BR")}))
-  ];
-
-  // 3) ordenação default: Total geral desc
-  SORT_STATE["coefPivot"] = {key:"TOTAL_GERAL", dir:-1};
-  sortRows(rows, {...colsPivot.find(c=>c.key==="TOTAL_GERAL"), __stateKey:"coefPivot"});
-
-  // 4) render com classes sticky e cores condicionais
-  const pivotHTML = buildSortableTableHTML(
-    "coefPivot",
-    colsPivot,
-    rows,
-    (r)=>{
-      const tot = r["TOTAL_GERAL"];
-      const totCell = (tot==null) ? "—" : fmtBRL(tot);
-
-      // produto + total geral primeiro
-      const out = [
-        // PRODUTO
-        `<span>${r.produto}</span>`,
-        // Total geral
-        totCell
-      ];
-
-      // datas (desc) com cor vs total
-      for(const d of daysDesc){
-        const v = r[d];
-        if(v==null || !isFinite(v) || tot==null || !isFinite(tot)){
-          out.push("—");
-          continue;
-        }
-        const cls = (v > tot) ? "cell-hi" : (v < tot) ? "cell-lo" : "cell-eq";
-        out.push(`<span class="${cls}">${fmtBRL(v)}</span>`);
-      }
-      return out;
-    }
-  );
-
-  // injeta tabela e aplica classes sticky + quebra após Total geral
-  const wrap = document.getElementById("tbl_coef_pivot");
-  wrap.innerHTML = pivotHTML;
-
-  // aplica classes nos TH/TD (porque o builder é genérico)
-  // - coluna 0 = PRODUTO sticky
-  // - coluna 1 = TOTAL_GERAL sticky + quebra forte
-  const table = wrap.querySelector("table");
-  if(table){
-    table.classList.add("pivotTable");
-
-    // header
-    const ths = table.querySelectorAll("thead th");
-    if(ths[0]){
-      ths[0].classList.add("stickyL","col-prod");
-    }
-    if(ths[1]){
-      ths[1].classList.add("stickyL2","col-tot","breakAfter");
-    }
-
-    // body cells
-    table.querySelectorAll("tbody tr").forEach(tr=>{
-      const tds = tr.querySelectorAll("td");
-      if(tds[0]){
-        tds[0].classList.add("stickyL","col-prod");
-      }
-      if(tds[1]){
-        tds[1].classList.add("stickyL2","col-tot","breakAfter");
-      }
-    });
-  }
-
-  // bind sort (mantém seu comportamento: clicar no cabeçalho reordena)
-  // OBS: ao reordenar, precisamos re-render + reaplicar classes sticky/break.
-  // Para isso, sobrescrevemos o bind apenas deste pivot com um wrapper.
-  wrap.onclick = (ev)=>{
-    const th = ev.target.closest("th.sortable");
-    if(!th) return;
-    const colKey = th.getAttribute("data-col");
-    const col = colsPivot.find(c=>c.key===colKey);
-    if(!col) return;
-
-    col.__stateKey = "coefPivot";
-    sortRows(rows, col);
-
-    // re-render
-    wrap.innerHTML = buildSortableTableHTML(
-      "coefPivot",
-      colsPivot,
-      rows,
-      (r)=>{
-        const tot = r["TOTAL_GERAL"];
-        const out = [
-          `<span>${r.produto}</span>`,
-          (tot==null) ? "—" : fmtBRL(tot)
-        ];
-        for(const d of daysDesc){
-          const v = r[d];
-          if(v==null || !isFinite(v) || tot==null || !isFinite(tot)){
-            out.push("—");
-            continue;
-          }
-          const cls = (v > tot) ? "cell-hi" : (v < tot) ? "cell-lo" : "cell-eq";
-          out.push(`<span class="${cls}">${fmtBRL(v)}</span>`);
-        }
-        return out;
-      }
-    );
-
-    // reaplica sticky + quebra
-    const table2 = wrap.querySelector("table");
-    if(table2){
-      table2.classList.add("pivotTable");
-      const ths2 = table2.querySelectorAll("thead th");
-      if(ths2[0]) ths2[0].classList.add("stickyL","col-prod");
-      if(ths2[1]) ths2[1].classList.add("stickyL2","col-tot","breakAfter");
-
-      table2.querySelectorAll("tbody tr").forEach(tr=>{
-        const tds = tr.querySelectorAll("td");
-        if(tds[0]) tds[0].classList.add("stickyL","col-prod");
-        if(tds[1]) tds[1].classList.add("stickyL2","col-tot","breakAfter");
-      });
-    }
-  };
-
-} else {
-  document.getElementById("tbl_coef_pivot").innerHTML =
-    `<div class="muted small" style="padding:10px;">Sem dados para montar o pivot no período.</div>`;
-}
 /* =========================================================
    Persistência (compartilhar período/CSV com outras páginas)
 ========================================================= */
@@ -434,7 +273,6 @@ function loadSharedStateDefaults(){
   const csvEl = document.getElementById("csvUrl");
   if(defCsv) csvEl.value = defCsv;
   else {
-    // fallback (se ainda não houver localStorage)
     csvEl.value = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTr68Lpc3SFv05Wn28gQ3iBCk0jmRdRrWVGM49AE-3bVYR4poLY30Jxfaht2JDgUE5zyNx8vl55nAG2/pub?gid=625178800&single=true&output=csv";
   }
 
@@ -617,18 +455,13 @@ function applyDateFilter(){
 }
 
 /* =========================
-   Ordenação por clique em TH (reutilizável por tabela)
-   - tableId: id do container (.tablewrap)
-   - stateKey: nome único para guardar estado do sort
-   - columns: [{key, type, label}]
-   - rows: array de objetos
-   - renderRow: fn(obj)->array de células HTML
+   Ordenação por clique em TH
 ========================= */
 const SORT_STATE = {}; // stateKey -> {key, dir}
 function sortRows(rows, col){
   const {key, type} = col;
   const st = SORT_STATE[col.__stateKey] || {key:null, dir:1};
-  const nextDir = (st.key === key) ? -st.dir : 1; // alterna
+  const nextDir = (st.key === key) ? -st.dir : 1;
   SORT_STATE[col.__stateKey] = {key, dir: nextDir};
 
   const dir = nextDir;
@@ -652,10 +485,7 @@ function sortRows(rows, col){
 }
 
 function buildSortableTableHTML(stateKey, columns, rowObjs, renderRow){
-  // injeta stateKey no metadata de coluna
   const cols = columns.map(c => ({...c, __stateKey: stateKey}));
-
-  // cabeçalho com indicadores
   const st = SORT_STATE[stateKey] || {key:null, dir:1};
 
   let html = `<table><thead><tr>`;
@@ -678,7 +508,7 @@ function buildSortableTableHTML(stateKey, columns, rowObjs, renderRow){
   return html;
 }
 
-function bindSortClicks(containerId, stateKey, columns, rowObjs, renderRow){
+function bindSortClicks(containerId, stateKey, columns, rowObjs, renderRow, afterRender){
   const wrap = document.getElementById(containerId);
   if(!wrap) return;
 
@@ -689,10 +519,10 @@ function bindSortClicks(containerId, stateKey, columns, rowObjs, renderRow){
     const col = columns.find(c=>c.key===colKey);
     if(!col) return;
 
-    // ordena e re-render
     col.__stateKey = stateKey;
     sortRows(rowObjs, col);
     wrap.innerHTML = buildSortableTableHTML(stateKey, columns, rowObjs, renderRow);
+    if(typeof afterRender === "function") afterRender(wrap);
   };
 }
 
@@ -730,12 +560,10 @@ async function loadData(){
   RAW_HEADER = raw[0].map(h=>String(h||"").replace(/\u00A0/g," ").trim());
   const idx = makeIndexMap(RAW_HEADER);
 
-  // DEBUG
   document.getElementById("dbg_cols").innerHTML = `Colunas no CSV: <b>${RAW_HEADER.length}</b>`;
   const tail = RAW_HEADER.slice(Math.max(0, RAW_HEADER.length-14));
   document.getElementById("dbg_lastcols").innerHTML = `Últimas colunas: <code>${tail.join(" | ")}</code>`;
 
-  // colunas necessárias para COEF
   const cData = colAny(idx, ["DATA"]);
   const cProd = colAny(idx, ["PRODUTO"]);
   const cKilo = colAny(idx, ["KILO"]);
@@ -770,15 +598,6 @@ function weightedAvg(sumPxK, sumK){
   return sumPxK / sumK;
 }
 
-/**
- * Gera agregados por produto:
- * - kilos (Σ KILO)
- * - min/max rkg
- * - ex_pon (média ponderada por KG)
- * - dif_precos (max-min)
- * - dif_ex_min (ex_pon - min)
- * - coef = 1 - dif_ex_min/dif_precos
- */
 function buildTop20CoefAgg(dataFiltered){
   const byProd = new Map();
 
@@ -797,10 +616,8 @@ function buildTop20CoefAgg(dataFiltered){
     }
     const g = byProd.get(p);
 
-    // kilos
     g.kilos += k;
 
-    // preços
     if(r.rkg!=null && isFinite(r.rkg)){
       g.min_rkg = (g.min_rkg==null) ? r.rkg : Math.min(g.min_rkg, r.rkg);
       g.max_rkg = (g.max_rkg==null) ? r.rkg : Math.max(g.max_rkg, r.rkg);
@@ -815,7 +632,6 @@ function buildTop20CoefAgg(dataFiltered){
   arr.sort((a,b)=> (b.kilos - a.kilos));
   arr = arr.slice(0,20);
 
-  // completa métricas
   for(const g of arr){
     g.ex_pon = weightedAvg(g.sumPxK, g.sumK);
     g.dif_precos = (g.min_rkg!=null && g.max_rkg!=null) ? (g.max_rkg - g.min_rkg) : null;
@@ -825,10 +641,6 @@ function buildTop20CoefAgg(dataFiltered){
       : null;
   }
 
-  // coef total do bloco (igual sua lógica Q3/R3/T3):
-  // Q3 = Σ DIF_PREÇOS onde DIF_EX_MIN > 0
-  // R3 = Σ DIF_EX_MIN
-  // T3 = 1 - R3/Q3
   const sumQ = arr
     .filter(x => x.dif_ex_min!=null && isFinite(x.dif_ex_min) && x.dif_ex_min > 0)
     .map(x => x.dif_precos)
@@ -851,7 +663,6 @@ function buildTop20CoefAgg(dataFiltered){
 function buildPivotTop20(dataFiltered, top20List, dateMin, dateMax){
   const topSet = new Set(top20List.map(x=>x.produto));
 
-  // lista de datas no período (ordenadas)
   const days = [];
   const d0 = new Date(dateMin.getFullYear(), dateMin.getMonth(), dateMin.getDate());
   const d1 = new Date(dateMax.getFullYear(), dateMax.getMonth(), dateMax.getDate());
@@ -859,7 +670,6 @@ function buildPivotTop20(dataFiltered, top20List, dateMin, dateMax){
     days.push(toISO(d));
   }
 
-  // map produto -> map dia -> {sumPxK, sumK}
   const grid = new Map();
   for(const p of topSet) grid.set(p, new Map());
 
@@ -876,13 +686,11 @@ function buildPivotTop20(dataFiltered, top20List, dateMin, dateMax){
     cell.sumK   += r.kilo;
   }
 
-  // monta linhas pivot
   const rows = [];
   for(const g of top20List){
     const p = g.produto;
     const m = grid.get(p) || new Map();
 
-    // total geral (ponderado)
     let tSumPxK=0, tSumK=0;
 
     const row = { produto:p };
@@ -906,32 +714,28 @@ function buildPivotTop20(dataFiltered, top20List, dateMin, dateMax){
    Últimas 4 semanas (%COEF)
 ========================= */
 function startOfISOWeek(date){
-  // ISO: segunda = 1 ... domingo = 7
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = d.getDay(); // 0=dom,1=seg...
+  const day = d.getDay();
   const iso = (day===0) ? 7 : day;
-  d.setDate(d.getDate() - (iso-1)); // volta para segunda
+  d.setDate(d.getDate() - (iso-1));
   return d;
 }
-
 function addDays(d, n){
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   x.setDate(x.getDate()+n);
   return x;
 }
-
 function buildLast4WeeksCoef(allDataFiltered, endDate){
   const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-  const w0 = startOfISOWeek(end); // semana do end
+  const w0 = startOfISOWeek(end);
   const weeks = [];
 
-  // pega 4 semanas (inclui semana do end, e as 3 anteriores)
   for(let i=0;i<4;i++){
     const ws = addDays(w0, -7*i);
     const we = addDays(ws, 6);
     weeks.push({ ws, we });
   }
-  weeks.reverse(); // do mais antigo -> mais recente
+  weeks.reverse();
 
   const rows = [];
   for(const w of weeks){
@@ -951,6 +755,26 @@ function buildLast4WeeksCoef(allDataFiltered, endDate){
 }
 
 /* =========================
+   Render helpers do Pivot (sticky + quebra)
+========================= */
+function applyPivotStickyStyles(wrap){
+  const table = wrap.querySelector("table");
+  if(!table) return;
+
+  table.classList.add("pivotTable");
+
+  const ths = table.querySelectorAll("thead th");
+  if(ths[0]) ths[0].classList.add("stickyL","col-prod");
+  if(ths[1]) ths[1].classList.add("stickyL2","col-tot","breakAfter");
+
+  table.querySelectorAll("tbody tr").forEach(tr=>{
+    const tds = tr.querySelectorAll("td");
+    if(tds[0]) tds[0].classList.add("stickyL","col-prod");
+    if(tds[1]) tds[1].classList.add("stickyL2","col-tot","breakAfter");
+  });
+}
+
+/* =========================
    Render page
 ========================= */
 function renderPage(dataFiltered){
@@ -958,7 +782,6 @@ function renderPage(dataFiltered){
   const selMin = datesSel.length ? datesSel[0] : null;
   const selMax = datesSel.length ? datesSel[datesSel.length-1] : null;
 
-  // KPIs base
   document.getElementById("kpi_rows").textContent = fmtNum(dataFiltered.length,0);
   document.getElementById("kpi_prod").textContent = fmtNum(new Set(dataFiltered.map(x=>x.produto)).size,0);
 
@@ -971,7 +794,6 @@ function renderPage(dataFiltered){
     document.getElementById("kpi_range").textContent = "—";
   }
 
-  // ===== 1) Top 20 COEF =====
   const { top20, coefTotal } = buildTop20CoefAgg(dataFiltered);
 
   document.getElementById("kpi_top20k").textContent = top20.length ? `Top 20: ${fmtNum(top20.length,0)}` : "Top 20: —";
@@ -979,7 +801,7 @@ function renderPage(dataFiltered){
   document.getElementById("kpi_4w").textContent = selMax ? "últimas 4 semanas" : "—";
   document.getElementById("kpi_lastdate").textContent = selMax ? `até ${selMax.toLocaleDateString("pt-BR")}` : "—";
 
-  // tabela top20 (sortable)
+  // ===== 1) Top 20 COEF =====
   const top20Rows = top20.map(x=>({
     produto:x.produto,
     kilos:x.kilos,
@@ -1002,9 +824,7 @@ function renderPage(dataFiltered){
     {key:"coef", type:"num", label:"% COEF."}
   ];
 
-  // default sort: kilos desc
   SORT_STATE["coefTop20"] = {key:"kilos", dir:-1};
-  // aplica o sort default uma vez
   sortRows(top20Rows, {...colsTop20.find(c=>c.key==="kilos"), __stateKey:"coefTop20"});
 
   const top20HTML = buildSortableTableHTML(
@@ -1023,44 +843,58 @@ function renderPage(dataFiltered){
     ]
   );
   document.getElementById("tbl_coef_top20").innerHTML = top20HTML;
+
   bindSortClicks("tbl_coef_top20", "coefTop20", colsTop20, top20Rows, (r)=>[
     r.produto, fmtNum(r.kilos,0), fmtBRL(r.min_rkg), fmtBRL(r.max_rkg),
     fmtBRL(r.dif_precos), fmtBRL(r.dif_ex_min), fmtBRL(r.ex_pon),
     (r.coef==null) ? "—" : fmtPctHTML(r.coef,2)
   ]);
 
-  // ===== 2) Pivot por dia (top20) =====
+  // ===== 2) Pivot por dia (Top 20) — NOVO (ordem, sticky, cores) =====
+  const wrapPivot = document.getElementById("tbl_coef_pivot");
+
   if(selMin && selMax && top20.length){
     const { days, rows } = buildPivotTop20(dataFiltered, top20, selMin, selMax);
 
+    const daysDesc = [...days].reverse();
+
     const colsPivot = [
       {key:"produto", type:"str", label:"PRODUTO"},
-      ...days.map(d=>({key:d, type:"num", label:new Date(d).toLocaleDateString("pt-BR")})),
-      {key:"TOTAL_GERAL", type:"num", label:"Total geral"}
+      {key:"TOTAL_GERAL", type:"num", label:"Total geral"},
+      ...daysDesc.map(d=>({key:d, type:"num", label:new Date(d).toLocaleDateString("pt-BR")}))
     ];
 
-    // default sort: TOTAL_GERAL desc
+    // default sort: TOTAL_GERAL desc (fixo)
     SORT_STATE["coefPivot"] = {key:"TOTAL_GERAL", dir:-1};
     sortRows(rows, {...colsPivot.find(c=>c.key==="TOTAL_GERAL"), __stateKey:"coefPivot"});
 
-    const pivotHTML = buildSortableTableHTML(
-      "coefPivot",
-      colsPivot,
-      rows,
-      (r)=>[
-        r.produto,
-        ...days.map(d=> r[d]==null ? "—" : fmtBRL(r[d])),
-        r["TOTAL_GERAL"]==null ? "—" : fmtBRL(r["TOTAL_GERAL"])
-      ]
-    );
-    document.getElementById("tbl_coef_pivot").innerHTML = pivotHTML;
-    bindSortClicks("tbl_coef_pivot", "coefPivot", colsPivot, rows, (r)=>[
-      r.produto,
-      ...days.map(d=> r[d]==null ? "—" : fmtBRL(r[d])),
-      r["TOTAL_GERAL"]==null ? "—" : fmtBRL(r["TOTAL_GERAL"])
-    ]);
+    const renderPivotRow = (r)=>{
+      const tot = r["TOTAL_GERAL"];
+      const out = [
+        `<span>${r.produto}</span>`,
+        (tot==null) ? "—" : fmtBRL(tot)
+      ];
+
+      for(const d of daysDesc){
+        const v = r[d];
+        if(v==null || !isFinite(v) || tot==null || !isFinite(tot)){
+          out.push("—");
+          continue;
+        }
+        const cls = (v > tot) ? "cell-hi" : (v < tot) ? "cell-lo" : "cell-eq";
+        out.push(`<span class="${cls}">${fmtBRL(v)}</span>`);
+      }
+      return out;
+    };
+
+    wrapPivot.innerHTML = buildSortableTableHTML("coefPivot", colsPivot, rows, renderPivotRow);
+    applyPivotStickyStyles(wrapPivot);
+
+    // clique para ordenar + reaplicar sticky
+    bindSortClicks("tbl_coef_pivot", "coefPivot", colsPivot, rows, renderPivotRow, (wrap)=>applyPivotStickyStyles(wrap));
+
   } else {
-    document.getElementById("tbl_coef_pivot").innerHTML =
+    wrapPivot.innerHTML =
       `<div class="muted small" style="padding:10px;">Sem dados para montar o pivot no período.</div>`;
   }
 
@@ -1074,7 +908,6 @@ function renderPage(dataFiltered){
       {key:"linhas", type:"num", label:"Linhas"}
     ];
 
-    // default: semana asc (já vem ordenado), mas deixo ordenável
     SORT_STATE["coef4w"] = {key:"semana", dir:1};
 
     const html4w = buildSortableTableHTML(
@@ -1089,6 +922,7 @@ function renderPage(dataFiltered){
       ]
     );
     document.getElementById("tbl_coef_4w").innerHTML = html4w;
+
     bindSortClicks("tbl_coef_4w", "coef4w", cols4w, last4w, (r)=>[
       r.semana,
       (r.coef==null) ? "—" : fmtPctHTML(r.coef,2),
@@ -1107,7 +941,6 @@ function renderPage(dataFiltered){
 
 /* boot */
 loadSharedStateDefaults();
-// se quiser carregar automático ao abrir:
 window.addEventListener("load", loadData);
 </script>
 
