@@ -228,6 +228,7 @@
       <h3 style="margin:0 0 8px 0;">Maior desvio — NEC KGs (Bruno) vs KILO recebido</h3>
       <div class="muted small" style="margin-bottom:10px;">
         Regra: desvio% = (KILO − NEC) ÷ NEC (considera NEC &gt; 0 e KILO preenchido; janela 60 dias).
+        <b>Filtro:</b> mostra apenas desvios fora de <b>±20%</b>.
         Clique nos cabeçalhos para ordenar.
       </div>
       <div class="tablewrap" id="tbl_kgdev"></div>
@@ -722,18 +723,29 @@ function renderDashboard(dataFiltered){
       "<div class='muted small'>Nenhuma linha na janela (60 dias) com DIF. R$ fora de ±30%.</div>";
   }
 
-  /* 2) Desvio NEC vs KILO */
-  const kgdev=[];
+  /* 2) Desvio NEC vs KILO (apenas fora de ±20%) */
+  const LIMIAR_DESVIO = 0.20; // 20%
+  const kgdev = [];
+
   for(const r of inWin){
-    if(r.nec==null || r.nec===0 || r.kilo==null) continue;
-    const dev=(r.kilo-r.nec)/r.nec;
+    const nec  = (r.nec  != null && isFinite(r.nec))  ? r.nec  : null;
+    const kilo = (r.kilo != null && isFinite(r.kilo)) ? r.kilo : null;
+
+    // denominador NEC (obrigatório) e > 0
+    if(nec == null || nec <= 0) continue;
+    if(kilo == null) continue;
+
+    // desvio% = (KILO - NEC) / NEC
+    const dev = (kilo - nec) / nec;
+    if(!isFinite(dev) || Math.abs(dev) < LIMIAR_DESVIO) continue;
+
     kgdev.push({
       ...r,
       dev,
       abs: Math.abs(dev),
       dev_num: dev,
-      nec_num: r.nec,
-      kilo_num: r.kilo,
+      nec_num: nec,
+      kilo_num: kilo,
       dataTS: r.data ? r.data.getTime() : null
     });
   }
@@ -748,6 +760,9 @@ function renderDashboard(dataFiltered){
       { label:"Desvio",    key:"dev_num" }
     ];
 
+    // padrão: maior desvio absoluto primeiro
+    SORT_STATE.kgdev = { key: "abs", dir: "desc" };
+
     renderSortableTable(
       "kgdev","tbl_kgdev",cols,kgdev,
       (x)=>[
@@ -761,7 +776,7 @@ function renderDashboard(dataFiltered){
     );
   } else {
     document.getElementById("tbl_kgdev").innerHTML =
-      "<div class='muted small'>Sem dados suficientes (NEC e KILO) na janela de 60 dias.</div>";
+      "<div class='muted small'>Sem desvios (NEC vs KILO) fora de ±20% na janela de 60 dias.</div>";
   }
 
   /* 3) Dia anterior */
