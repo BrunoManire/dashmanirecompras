@@ -640,14 +640,37 @@ async function loadData(){
   const cKilo = colAny(idx, ["KILO","KG","KGS","QUANTIDADE","QTDE","QTD"]);
   const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG","PRECO","PREÇO","PRECO_PAGO","PREÇO PAGO","VALOR KG","VALOR_KG"]);
 
-      // referência base (Dash 4/5)
+       // referência base (Dash 4/5)
   const refCandidates = [
+    // existentes
     "PRECO_REFERENCIA","PREÇO REFERÊNCIA","PRECO_REF","PREÇO_REF",
     "R$.KG_REF","R$ KG REF","R$/KG REF","R$KG REF",
     "BASE_RKG","RKG_BASE","REFERENCIA","REFERÊNCIA",
-    "PRECO_BASE","PREÇO BASE","VALOR_BASE","R$_KG_BASE"
+    "PRECO_BASE","PREÇO BASE","VALOR_BASE","R$_KG_BASE",
+
+    // ADIÇÕES para bater com “BASE R$” (o que você citou)
+    "BASE R$","BASE_R$","BASE R","BASE_R",
+    "BASE","PREÇO BASE R$","PRECO BASE R$"
   ];
-  const cRef = colAny(idx, refCandidates);
+
+  // tem que ser LET (não const) para permitir fallback sem quebrar nada
+  let cRef = colAny(idx, refCandidates);
+
+  // Fallback: coluna AJ (0-based = 35) SOMENTE se não achou por nome
+  if(cRef == null && RAW_HEADER.length > 35){
+    const ajIdx = 35;
+    // valida rápido se AJ parece coluna numérica de preço
+    let numericCount = 0;
+    const sampleN = Math.min(300, raw.length - 1);
+    for(let i=1; i<=sampleN; i++){
+      const v = toNum(raw[i][ajIdx]);
+      if(v != null && isFinite(v)) numericCount++;
+    }
+    if(numericCount >= 10){
+      cRef = ajIdx;
+    }
+  }
+
   REF_COL_NAME = (cRef==null) ? null : RAW_HEADER[cRef];
 
 
