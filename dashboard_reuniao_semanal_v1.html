@@ -640,73 +640,16 @@ async function loadData(){
   const cKilo = colAny(idx, ["KILO","KG","KGS","QUANTIDADE","QTDE","QTD"]);
   const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG","PRECO","PREÇO","PRECO_PAGO","PREÇO PAGO","VALOR KG","VALOR_KG"]);
 
-    // referência base (Dash 4/5)
+      // referência base (Dash 4/5)
   const refCandidates = [
     "PRECO_REFERENCIA","PREÇO REFERÊNCIA","PRECO_REF","PREÇO_REF",
     "R$.KG_REF","R$ KG REF","R$/KG REF","R$KG REF",
     "BASE_RKG","RKG_BASE","REFERENCIA","REFERÊNCIA",
     "PRECO_BASE","PREÇO BASE","VALOR_BASE","R$_KG_BASE"
   ];
-
-  let cRef = colAny(idx, refCandidates);
-
-  // 1) Fallback: AJ (0-based = 35), se existir e tiver números
-  if(cRef == null && RAW_HEADER.length > 35){
-    const ajIdx = 35;
-    let numericCount = 0;
-    const sampleN = Math.min(300, raw.length - 1);
-    for(let i=1; i<=sampleN; i++){
-      const v = toNum(raw[i][ajIdx]);
-      if(v != null && isFinite(v)) numericCount++;
-    }
-    if(numericCount >= 10){
-      cRef = ajIdx;
-    }
-  }
-
-  // 2) Autodetecção: encontra a coluna numérica mais “próxima” do preço pago (R$.KG),
-  // desde que NÃO seja a própria coluna de preço pago.
-  if(cRef == null){
-    // cRkg já existe acima no seu código (colAny(... R$.KG ...))
-    const paidIdx = cRkg;
-    if(paidIdx != null){
-      const sampleN = Math.min(500, raw.length - 1);
-
-      let best = null; // {j, score, n}
-      for(let j=0; j<RAW_HEADER.length; j++){
-        if(j === paidIdx) continue;
-
-        let n=0;
-        let sumAbsDiff=0;
-
-        for(let i=1; i<=sampleN; i++){
-          const paid = toNum(raw[i][paidIdx]);
-          const ref  = toNum(raw[i][j]);
-          if(paid==null || ref==null || !isFinite(paid) || !isFinite(ref)) continue;
-
-          // filtros simples para evitar colunas “gigantes” ou irrelevantes
-          if(ref <= 0 || ref > 10000) continue;
-          if(paid <= 0 || paid > 10000) continue;
-
-          n++;
-          sumAbsDiff += Math.abs(paid - ref);
-        }
-
-        if(n < 20) continue; // precisa ter dados suficientes
-        const score = sumAbsDiff / n; // menor = mais parecido com referência
-
-        if(best == null || score < best.score){
-          best = { j, score, n };
-        }
-      }
-
-      if(best){
-        cRef = best.j;
-      }
-    }
-  }
-
+  const cRef = colAny(idx, refCandidates);
   REF_COL_NAME = (cRef==null) ? null : RAW_HEADER[cRef];
+
 
   if(cData==null || cProd==null || cKilo==null || cRkg==null){
     alert("Não encontrei todas as colunas necessárias: DATA, PRODUTO, KILO/KG, R$.KG.\nVerifique o cabeçalho no DEBUG.");
