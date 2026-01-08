@@ -640,14 +640,33 @@ async function loadData(){
   const cKilo = colAny(idx, ["KILO","KG","KGS","QUANTIDADE","QTDE","QTD"]);
   const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG","PRECO","PREÇO","PRECO_PAGO","PREÇO PAGO","VALOR KG","VALOR_KG"]);
 
-  // referência base (Dash 4/5)
+    // referência base (Dash 4/5)
   const refCandidates = [
     "PRECO_REFERENCIA","PREÇO REFERÊNCIA","PRECO_REF","PREÇO_REF",
     "R$.KG_REF","R$ KG REF","R$/KG REF","R$KG REF",
     "BASE_RKG","RKG_BASE","REFERENCIA","REFERÊNCIA",
     "PRECO_BASE","PREÇO BASE","VALOR_BASE","R$_KG_BASE"
   ];
-  const cRef = colAny(idx, refCandidates);
+
+  let cRef = colAny(idx, refCandidates);
+
+  // Fallback: sua referência está na coluna AJ da planilha.
+  // No CSV, AJ = índice 35 (0-based). Só aplica se:
+  // - a coluna existir
+  // - e tiver números suficientes para ser “preço referência”
+  if(cRef == null && RAW_HEADER.length > 35){
+    const ajIdx = 35;
+    let numericCount = 0;
+    const sampleN = Math.min(200, raw.length - 1); // amostra das primeiras linhas
+    for(let i=1; i<=sampleN; i++){
+      const v = toNum(raw[i][ajIdx]);
+      if(v != null && isFinite(v)) numericCount++;
+    }
+    if(numericCount >= 10){ // limiar simples para evitar coluna errada
+      cRef = ajIdx;
+    }
+  }
+
   REF_COL_NAME = (cRef==null) ? null : RAW_HEADER[cRef];
 
   if(cData==null || cProd==null || cKilo==null || cRkg==null){
