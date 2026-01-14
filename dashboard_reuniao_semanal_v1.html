@@ -36,13 +36,25 @@
   .kpi .lbl{color:var(--muted);font-size:12px;}
   .tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
 
+  /* =========================================================
+     AJUSTE SOLICITADO:
+     - Sem scroll vertical (linhas) nas análises Top 20 e Pivot:
+       -> mostramos todas as 20 linhas na tela.
+     - Mantém scroll apenas HORIZONTAL para análise do período (colunas).
+     ========================================================= */
   .tablewrap{
-    max-height:430px;
-    overflow:auto;
+    overflow-x:auto;          /* mantém scroll horizontal */
+    overflow-y:visible;       /* remove scroll vertical */
     border:1px solid var(--line);
     border-radius:12px;
     background:#0f1520;
   }
+  /* remove limite de altura para não "cortar" as 20 linhas */
+  .tablewrap.noY{
+    max-height:none;
+    overflow-y:visible;
+  }
+  /* pivot: permite colunas largas com scroll horizontal */
   table{width:100%;border-collapse:collapse;font-size:12px;min-width:980px;}
   th,td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;}
   th{text-align:left;color:var(--muted);font-weight:600;position:sticky;top:0;background:#0f1520;z-index:1;}
@@ -90,6 +102,7 @@
 
   /* =========================
      PIVOT: sticky 2 primeiras colunas + quebra visual
+     - IMPORTANTe: sticky funciona com overflow-x no wrapper
      ========================= */
   .pivotTable{ min-width:1200px; }
 
@@ -232,7 +245,8 @@
         <b>%COEF</b> = 1 − (DIF_EX_MIN / DIF_PREÇOS).
         Ordene clicando nos cabeçalhos.
       </div>
-      <div class="tablewrap" id="tbl_coef_top20"></div>
+      <!-- noY: sem scroll vertical; mostra as 20 linhas -->
+      <div class="tablewrap noY" id="tbl_coef_top20"></div>
 
       <div class="sep-strong"></div>
 
@@ -240,8 +254,10 @@
       <div class="muted small" style="margin-bottom:10px;">
         Linhas = produto (Top 20 por KG no período). Colunas = datas do período. Valores = média ponderada de <b>R$.KG</b> por KG no dia.
         Ordene clicando no cabeçalho (ex.: “Total geral”).
+        <b>Obs:</b> aqui o scroll é apenas horizontal (colunas), mantendo as 20 linhas visíveis.
       </div>
-      <div class="tablewrap" id="tbl_coef_pivot"></div>
+      <!-- noY: sem scroll vertical; scroll só horizontal -->
+      <div class="tablewrap noY" id="tbl_coef_pivot"></div>
 
       <div class="sep-strong"></div>
 
@@ -249,7 +265,8 @@
       <div class="muted small" style="margin-bottom:10px;">
         Para cada semana: calcula Top 20 por KG (da semana) e aplica a mesma lógica do COEF.
       </div>
-      <div class="tablewrap" id="tbl_coef_4w"></div>
+      <!-- este pode ter mais linhas; mantemos como estava (sem max-height também, pois é curto) -->
+      <div class="tablewrap noY" id="tbl_coef_4w"></div>
 
       <!-- =========================
            DASH 4
@@ -294,7 +311,7 @@
         </div>
       </div>
 
-      <div class="tablewrap" id="tbl_inef_byday"></div>
+      <div class="tablewrap noY" id="tbl_inef_byday"></div>
 
       <!-- =========================
            DASH 5
@@ -305,7 +322,7 @@
       <div class="muted small" style="margin-bottom:10px;">
         Soma a ineficiência por semana (segunda a domingo) e mostra o pior produto de cada semana.
       </div>
-      <div class="tablewrap" id="tbl_inef_4w"></div>
+      <div class="tablewrap noY" id="tbl_inef_4w"></div>
     </div>
 
   </div>
@@ -641,10 +658,8 @@ async function loadData(){
   const cRkg  = colAny(idx, ["R$.KG","R$ KG","R$/KG","R$KG","PRECO","PREÇO","PRECO_PAGO","PREÇO PAGO","VALOR KG","VALOR_KG"]);
 
   /* =========================================================
-     AJUSTE DEFINITIVO (Dash 4/5):
-     - A referência NÃO é "BASE", nem "REF", nem dedução.
-     - A coluna real do seu CSV é: "BASE R$"
-     - Não usar "BASE" como candidato (porque bate na coluna "Base" com "-").
+     Dash 4/5:
+     - Coluna de referência do CSV é: "BASE R$"
   ========================================================== */
   const refCandidates = ["BASE R$","BASE_R$"];
   let cRef = colAny(idx, refCandidates);
@@ -665,8 +680,8 @@ async function loadData(){
     const produto = String(r[cProd]||"").trim();
     const kilo = toNum(r[cKilo]);
 
-    const pricePaid = toNum(r[cRkg]);              // preço pago por KG (usado no COEF e Dash 4/5)
-    const priceRef  = (cRef==null) ? null : toNum(r[cRef]); // BASE R$ (referência) por KG
+    const pricePaid = toNum(r[cRkg]);              // preço pago por KG
+    const priceRef  = (cRef==null) ? null : toNum(r[cRef]); // referência por KG (BASE R$)
 
     return {
       data:d,
@@ -737,7 +752,6 @@ function buildTop20CoefAgg(dataFiltered){
   }
 
   const sumQ = arr
-    .filter(x => x.dif_ex_min!=null && isFinite(x.dif_ex_min) && x.dif_ex_min > 0)
     .map(x => x.dif_precos)
     .filter(v => v!=null && isFinite(v) && v>0)
     .reduce((s,v)=>s+v,0);
@@ -866,7 +880,7 @@ function buildInefByDay(dataFiltered){
     const ref  = r.priceRef;
     if(paid==null || ref==null || !isFinite(paid) || !isFinite(ref)) continue;
 
-    const delta = (kg * paid) - (kg * ref); // negativo = prejuízo
+    const delta = (kg * paid) - (kg * ref);
 
     if(!byDay.has(r.dataISO)) byDay.set(r.dataISO, new Map());
     const mProd = byDay.get(r.dataISO);
@@ -1183,7 +1197,6 @@ function renderPage(dataFiltered){
       {key:"pior_val", type:"num", label:"PIOR PRODUTO (R$)"}
     ];
 
-    // default: pior (mais negativo) primeiro
     SORT_STATE["inefByDay"] = {key:"inef", dir:1};
     sortRows(rowsDay, {...colsDay.find(c=>c.key==="inef"), __stateKey:"inefByDay"});
 
@@ -1249,7 +1262,7 @@ function renderPage(dataFiltered){
 
   document.getElementById("meta").textContent =
     `OK — ${fmtNum(dataFiltered.length,0)} linhas no período. ` +
-    `Ordene clicando nos cabeçalhos (Top 20 / Pivot / 4 semanas / Ineficiência).`;
+    `Sem scroll vertical nas tabelas Top 20 (linhas sempre visíveis). Scroll horizontal permanece para análise das colunas do período.`;
 }
 
 /* boot */
