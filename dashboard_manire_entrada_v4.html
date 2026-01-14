@@ -441,10 +441,14 @@ function toDate(v){
 }
 function toISO(d){ return d.toISOString().slice(0,10); }
 
+<script>
 /* =========================
-   Ordenação + tabela clicável
+   Ordenação + tabela clicável (FIX)
+   - Re-renderiza SOMENTE a tabela clicada
+   - Não chama renderDashboard() no click
 ========================= */
 function safeStr(v){ return (v==null) ? "" : String(v); }
+
 function compare(a, b, dir){
   const mult = (dir === "asc") ? 1 : -1;
 
@@ -464,17 +468,31 @@ function compare(a, b, dir){
   if(sa === sb) return 0;
   return (sa > sb ? 1 : -1) * mult;
 }
-function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
-  const state = SORT_STATE[tableId] || { key: cols[0]?.key, dir: "asc" };
-  SORT_STATE[tableId] = state;
 
+/**
+ * Renderiza tabela ordenável e resolve clique no cabeçalho SEM re-render global.
+ * @param {string} tableId  - chave do SORT_STATE (ex.: "price", "kgdev"...)
+ * @param {string} mountId  - id do container onde a tabela entra
+ * @param {Array<{label:string,key:string,type?:'num'|'str'|'date'}>} cols
+ * @param {Array<Object>} rows
+ * @param {(row:Object)=>string[]} rowToCells
+ */
+function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
+  // default apenas se ainda não existir estado pra essa tabela
+  if(!SORT_STATE[tableId]){
+    SORT_STATE[tableId] = { key: cols[0]?.key, dir: "asc" };
+  }
+
+  const state = SORT_STATE[tableId];
   const sorted = [...rows].sort((r1, r2) => compare(r1[state.key], r2[state.key], state.dir));
 
   let html = `<table><thead><tr>`;
   for(const c of cols){
     const active = (c.key === state.key);
     const ind = active ? (state.dir === "asc" ? "▲" : "▼") : "";
-    html += `<th class="sortable" data-t="${tableId}" data-k="${c.key}">${c.label}<span class="sort-ind">${ind}</span></th>`;
+    html += `<th class="sortable" data-t="${tableId}" data-k="${c.key}">
+              ${c.label}<span class="sort-ind">${ind}</span>
+            </th>`;
   }
   html += `</tr></thead><tbody>`;
 
@@ -487,20 +505,26 @@ function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
   const mount = document.getElementById(mountId);
   mount.innerHTML = html;
 
-  mount.querySelectorAll("th.sortable").forEach(th=>{
-    th.addEventListener("click", ()=>{
-      const t = th.getAttribute("data-t");
-      const k = th.getAttribute("data-k");
-      const st = SORT_STATE[t] || { key:k, dir:"asc" };
+  // Event delegation (mais robusto que add em cada TH)
+  mount.onclick = (ev)=>{
+    const th = ev.target.closest("th.sortable");
+    if(!th) return;
 
-      if(st.key === k) st.dir = (st.dir === "asc") ? "desc" : "asc";
-      else { st.key = k; st.dir = "asc"; }
+    const t = th.getAttribute("data-t");
+    const k = th.getAttribute("data-k");
 
-      SORT_STATE[t] = st;
-      renderDashboard(filterBySelectedDates(ALL_DATA));
-    });
-  });
+    const st = SORT_STATE[t] || { key: k, dir: "asc" };
+    if(st.key === k) st.dir = (st.dir === "asc") ? "desc" : "asc";
+    else { st.key = k; st.dir = "asc"; }
+
+    SORT_STATE[t] = st;
+
+    // Re-renderiza somente esta tabela
+    renderSortableTable(t, mountId, cols, rows, rowToCells);
+  };
 }
+</script>
+
 
 /* =========================
    Date filter helpers
