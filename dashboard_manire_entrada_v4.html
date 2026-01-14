@@ -129,7 +129,6 @@
     O período e o CSV são compartilhados entre páginas.
   </div>
 
-  <!-- Troque o active conforme a página -->
   <a class="navlink active" href="./dashboard_manire_entrada_v4.html"><b>Dashboard — Entradas In Natura</b></a>
   <a class="navlink" href="./dashboard_reuniao_semanal_v1.html">Reunião Semanal</a>
 
@@ -441,7 +440,6 @@ function toDate(v){
 }
 function toISO(d){ return d.toISOString().slice(0,10); }
 
-<script>
 /* =========================
    Ordenação + tabela clicável (FIX)
    - Re-renderiza SOMENTE a tabela clicada
@@ -469,16 +467,7 @@ function compare(a, b, dir){
   return (sa > sb ? 1 : -1) * mult;
 }
 
-/**
- * Renderiza tabela ordenável e resolve clique no cabeçalho SEM re-render global.
- * @param {string} tableId  - chave do SORT_STATE (ex.: "price", "kgdev"...)
- * @param {string} mountId  - id do container onde a tabela entra
- * @param {Array<{label:string,key:string,type?:'num'|'str'|'date'}>} cols
- * @param {Array<Object>} rows
- * @param {(row:Object)=>string[]} rowToCells
- */
 function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
-  // default apenas se ainda não existir estado pra essa tabela
   if(!SORT_STATE[tableId]){
     SORT_STATE[tableId] = { key: cols[0]?.key, dir: "asc" };
   }
@@ -505,7 +494,6 @@ function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
   const mount = document.getElementById(mountId);
   mount.innerHTML = html;
 
-  // Event delegation (mais robusto que add em cada TH)
   mount.onclick = (ev)=>{
     const th = ev.target.closest("th.sortable");
     if(!th) return;
@@ -519,12 +507,9 @@ function renderSortableTable(tableId, mountId, cols, rows, rowToCells){
 
     SORT_STATE[t] = st;
 
-    // Re-renderiza somente esta tabela
     renderSortableTable(t, mountId, cols, rows, rowToCells);
   };
 }
-</script>
-
 
 /* =========================
    Date filter helpers
@@ -755,11 +740,9 @@ function renderDashboard(dataFiltered){
     const nec  = (r.nec  != null && isFinite(r.nec))  ? r.nec  : null;
     const kilo = (r.kilo != null && isFinite(r.kilo)) ? r.kilo : null;
 
-    // denominador NEC (obrigatório) e > 0
     if(nec == null || nec <= 0) continue;
     if(kilo == null) continue;
 
-    // desvio% = (KILO - NEC) / NEC
     const dev = (kilo - nec) / nec;
     if(!isFinite(dev) || Math.abs(dev) < LIMIAR_DESVIO) continue;
 
@@ -784,9 +767,7 @@ function renderDashboard(dataFiltered){
       { label:"Desvio",    key:"dev_num" }
     ];
 
-    // padrão: maior desvio absoluto primeiro
-    SORT_STATE.kgdev = { key: "abs", dir: "desc" };
-
+    /* NÃO resetar SORT_STATE.kgdev aqui (para não “matar” o clique do cabeçalho) */
     renderSortableTable(
       "kgdev","tbl_kgdev",cols,kgdev,
       (x)=>[
